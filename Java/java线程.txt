@@ -1,0 +1,18 @@
+Content-Type: text/x-zim-wiki
+Wiki-Format: zim 0.4
+Creation-Date: 2017-02-27T09:40:27+08:00
+
+====== java线程 ======
+Created 星期一 27 二月 2017
+
+	[[+synchronized同步]]
+	[[+volatile]]
+	[[+Lock接口]]
+	[[+等待通知]]
+	[[+Atom类]]
+
+		
+	
+	
+
+

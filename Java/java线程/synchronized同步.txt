@@ -1,0 +1,178 @@
+Content-Type: text/x-zim-wiki
+Wiki-Format: zim 0.4
+Creation-Date: 2017-02-27T09:59:28+08:00
+
+====== synchronized同步 ======
+Created 星期一 27 二月 2017
+
+=== synchronized锁住的是代码还是对象? ===
+	答案是：**synchronized锁住的是括号里的对象，而不是代码。**
+	**对于非static的synchronized方法，锁的就是对象本身也就是this。**
+	**synchronized(Sync.class)实现了全局锁的效果,也就是static synchronized方法可作为全局锁的秘密，相当于锁住了代码段**。
+	
+=== synchronized关键字不能继承 ===
+	虽然可以使用synchronized来定义方法，但synchronized并不属于方法定义的一部分，因此，synchronized关键字不能被继承。如果在父类中的某个方法使用了synchronized关键字，而在子类中覆盖了这个方法，在子类中的这个方法默认情况下并不是同步的，而必须显式地在子类的这个方法中加上synchronized关键字才可以
+
+
+=== 自定义用作锁的对象 ===
+	**哪个线程拿到那个锁它就可以运行它所控制的那段代码。** 
+{{{code: lang="java" linenumbers="True"
+//当有一个明确的对象作为锁时，就可以用类似下面这样的方式写程序。
+public void method3(SomeObject obj)
+{
+   //obj 锁定的对象
+   synchronized(obj)
+   {
+      // todo
+   }
+}
+//当没有明确的对象作为锁，只是想让一段代码同步时，可以创建一个特殊的对象来充当锁
+//零长度的byte数组对象创建起来将比任何对象都经济
+//查看编译后的字节码：生成零长度的byte[]对象只需3条操作码，
+//而Object lock = new Object()则需要7行操作码。
+class Test implements Runnable
+{
+   private byte[] lock = new byte[0];  // 特殊的instance变量
+   public void method()
+   {
+      synchronized(lock) {
+         // todo 同步代码块
+      }
+   }
+
+   public void run() {
+
+   }
+}
+
+}}}
+	
+
+**在定义接口方法时不能使用synchronized关键字**
+**构造方法不能使用synchronized关键字，但可以使用synchronized代码块来进行同步。** 
+
+synchronized是Java中的关键字，是一种同步锁。它修饰的对象有以下几种： 
+
+==== 修饰一个代码块 ====
+	被修饰的代码块称为同步语句块，其作用的范围是大括号{}括起来的代码，作用的对象是调用这个代码块的对象； 
+{{{code: lang="java" linenumbers="True"
+	/**
+	 * 同步线程
+	 */
+	class SyncThread implements Runnable {
+	   private static int count;
+	
+	   public SyncThread() {
+		  count = 0;
+	   }
+	
+	   public  void run() {
+		  synchronized(this) {
+			 for (int i = 0; i < 5; i++) {
+				try {
+				   System.out.println(Thread.currentThread().getName() + ":" + (count++));
+				   Thread.sleep(100);
+				} catch (InterruptedException e) {
+				   e.printStackTrace();
+				}
+			 }
+		  }
+	   }
+	
+	   public int getCount() {
+		  return count;
+	   }
+	}
+
+
+}}}
+	
+	调用同一个对象:
+{{{code: lang="java" linenumbers="True"
+SyncThread syncThread = new SyncThread();
+Thread thread1 = new Thread(syncThread, "SyncThread1");
+Thread thread2 = new Thread(syncThread, "SyncThread2");
+thread1.start();
+thread2.start();
+}}}
+	
+	结果:
+{{{code: lang="java" linenumbers="True"
+SyncThread1:0 
+SyncThread1:1 
+SyncThread1:2 
+SyncThread1:3 
+SyncThread1:4 
+SyncThread2:5 
+SyncThread2:6 
+SyncThread2:7 
+SyncThread2:8 
+SyncThread2:9*
+}}}
+
+	调用不同对象:
+{{{code: lang="java" linenumbers="True"
+SyncThread syncThread1 = new SyncThread();
+SyncThread syncThread2 = new SyncThread();
+Thread thread1 = new Thread(syncThread1, "SyncThread1");
+Thread thread2 = new Thread(syncThread2, "SyncThread2");
+thread1.start();
+thread2.start();
+}}}
+	
+	结果:
+{{{code: lang="java" linenumbers="True"
+SyncThread1:0 
+SyncThread2:1 
+SyncThread1:2 
+SyncThread2:3 
+SyncThread1:4 
+SyncThread2:5 
+SyncThread2:6 
+SyncThread1:7 
+SyncThread1:8 
+SyncThread2:9
+}}}
+	
+
+
+==== 修饰一个方法 ====
+	被修饰的方法称为同步方法，其作用的范围是整个方法，作用的对象是调用这个方法的对象； 
+
+==== 修改一个静态的方法 ====
+	其作用的范围是整个静态方法，作用的对象是这个类的所有对象； 
+
+==== 修改一个类 ====
+	其作用的范围是synchronized后面括号括起来的部分，作用主的对象是这个类的所有对象。
+{{{code: lang="java" linenumbers="True"
+/**
+ * 同步线程
+ */
+class SyncThread implements Runnable {
+   private static int count;
+
+   public SyncThread() {
+      count = 0;
+   }
+
+   public static void method() {
+      synchronized(SyncThread.class) {
+         for (int i = 0; i < 5; i ++) {
+            try {
+               System.out.println(Thread.currentThread().getName() + ":" + (count++));
+               Thread.sleep(100);
+            } catch (InterruptedException e) {
+               e.printStackTrace();
+            }
+         }
+      }
+   }
+
+   public synchronized void run() {
+      method();
+   }
+}
+}}}
+	
+	
+	
