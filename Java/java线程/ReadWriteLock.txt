@@ -1,0 +1,441 @@
+Content-Type: text/x-zim-wiki
+Wiki-Format: zim 0.4
+Creation-Date: 2017-03-03T13:20:14+08:00
+
+====== ReadWriteLock ======
+Created 星期五 03 三月 2017
+
+===== 简介 =====
+	相比Java中的锁(Locks in Java)里Lock实现，读写锁更复杂一些。假设你的程序中涉及到对一些共享资源的读和写操作，且写操作没有读操作那么频繁。在没有写操作的时候，两个线程同时读一个资源没有任何问题，所以应该允许多个线程能在同时读取共享资源。但是**如果有一个线程想去写这些共享资源，就不应该再有其它线程对该资源进行读或写**（译者注：也就是说：**读-读能共存，读-写不能共存，写-写不能共存**）。这就需要一个读/写锁来解决这个问题。
+
+	在Java并发包中常用的锁（如：ReentrantLock），基本上都是排他锁，这些锁在同一时刻只允许一个线程进行访问，
+	而读写锁在同一时 刻可以允许多个读线程访问，但是在写线程访问时，所有的读线程和其他写线程均被阻塞。**读写锁维护了一对锁，一个读锁和一个写锁，通过分离读锁和写锁，使得 并发性相比一般的排他锁有了很大提升。**
+	
+	除了保证写操作对读操作的可见性以及并发性的提升之外，读写锁能够简化读写交互场景的编程方式。假设在程序中定义一个共享的数据结构用作缓存，它大部分时间提供读服务（例如：查询和搜索），而写操作占有的时间很少，但是写操作完成之后的更新需要对后续的读服务可见。
+	
+	在没有读写锁支持的（Java 5 之前）时候，如果需要完成上述工作就要使用Java的等待通知机制，就是当写操作开始时，所有晚于写操作的读操作均会进入等待状态，只有写操作完成并进行 通知之后，所有等待的读操作才能继续执行（写操作之间依靠synchronized关键字进行同步），这样做的目的是使读操作都能读取到正确的数据，而不 会出现脏读。改用读写锁实现上述功能，只需要在读操作时获取读锁，而写操作时获取写锁即可，当写锁被获取到时，后续（非当前写操作线程）的读写操作都会被 阻塞，写锁释放之后，所有操作继续执行，编程方式相对于使用等待通知机制的实现方式而言，变得简单明了。
+	
+	一般情况下，**读写锁的性能都会比排它锁要好，因为大多数场景读是多于写的。在读多于写的情况下，读写锁能够提供比排它锁更好的并发性和吞吐量。**Java并发包提供读写锁的实现是ReentrantReadWriteLock，它提供的特性如表1所示。
+	特性: 
+	* **公平性选择** 
+	* **重进入**:该锁支持重进入，以读写线程为例：读线程在获取了读锁之后，能够再次获取读锁。而写线程在获取了写锁之后能够再次获取写锁，同时也可以获取读锁
+	* **锁降级**:遵循获取写锁、获取读锁再释放写锁的次序，写锁能够降级成为读锁
+
+===== 读写锁的接口 =====
+	ReadWriteLock仅定义了获取读锁和写锁的两个方法，即**readLock()**和**writeLock()**方法，而其实现—ReentrantReadWriteLock，除了接口方法之外，还提供了一些便于外界监控其内部工作状态的方法
+	**方法名称				描述**
+	**int getReadLockCount()**	返回当前读锁被获取的次数。该次数不等于获取读锁的线程数，比如：仅一个线程，它连续获取（重进入）了n次读锁，那么占据读锁的线程数是1，但该方法返回n
+	**int getReadHoldCount()**	返回当前线程获取读锁的次数。该方法在Java 6 中加入到ReentrantReadWriteLock中，使用ThreadLocal保存当前线程获取的次数，这也使得Java 6 的实现变得更加复杂
+	**boolean isWriteLocked()**	判断写锁是否被获取
+	**int getWriteHoldCount()**	返回当前写锁被获取的次数
+	
+===== 读写锁的示例 =====
+{{{code: lang="java" linenumbers="True"
+public class Cache {
+  static Map<String, Object> map = new HashMap<String, Object>();
+  static ReentrantReadWriteLock rwl = new ReentrantReadWriteLock();
+  static Lock r = rwl.readLock();
+  static Lock w = rwl.writeLock();
+  // 获取一个key对应的value
+  public static final Object get(String key) {
+    r.lock();
+    try {
+      return map.get(key);
+    } finally {
+      r.unlock();
+    }
+  }
+  // 设置key对应的value，并返回旧有的value
+  public static final Object put(String key, Object value) {
+    w.lock();
+    try {
+      return map.put(key, value);
+    } finally {
+      w.unlock();
+    }
+  }
+  // 清空所有的内容
+  public static final void clear() {
+    w.lock();
+    try {
+      map.clear();
+    } finally {
+      w.unlock();
+    }
+  }
+}
+}}}
+	
+
+
+===== 读写锁的实现分析 =====
+	接下来将分析ReentrantReadWriteLock的实现，主要包括：读写状态的设计、写锁的获取与释放、读锁的获取与释放以及锁降级（以下没有特别说明读写锁均可认为是ReentrantReadWriteLock）。
+
+==== 读写状态的设计 ====
+	读写锁同样依赖自定义同步器来实现同步功能，而读写状态就是其同步器的同步状态。回想ReentrantLock中自定义同步器的实现，同步状态 表示锁被一个线程重复获取的次数，而读写锁的自定义同步器需要在同步状态（一个整型变量）上维护多个读线程和一个写线程的状态，使得该状态的设计成为读写 锁实现的关键。
+	
+	如果在一个整型变量上维护多种状态，就一定需要“按位切割使用”这个变量，读写锁是将变量切分成了两个部分，高16位表示读，低16位表示写，划分方式如图1所示。
+	{{./pasted_image.png}}
+	当前同步状态表示一个线程已经获取了写锁，且重进入了两次，同时也连续获取了两次读锁。读写锁是如何迅速的确定读和写各自的状态呢？ 答案是通过位运算。假设当前同步状态值为S，写状态等于 S & 0x0000FFFF（将高16位全部抹去），读状态等于 S >>> 16（无符号补0右移16位）。当写状态增加1时，等于S + 1，当读状态增加1时，等于S + (1 << 16)，也就是S + 0×00010000。
+	
+	根据状态的划分能得出一个推论：S不等于0时，当写状态(S & 0x0000FFFF)等于0时，则读状态(S >>> 16)大于0，即读锁已被获取。
+
+==== 写锁的获取与释放 ====
+	写锁是一个支持重进入的排它锁。如果当前线程已经获取了写锁，则增加写状态。如果当前线程在获取写锁时，读锁已经被获取（读状态不为0）或者该线程不是已经获取写锁的线程，则当前线程进入等待状态.
+{{{code: lang="java" linenumbers="True"
+protected final boolean tryAcquire(int acquires) {
+  Thread current = Thread.currentThread();
+  int c = getState();
+  int w = exclusiveCount(c);
+  if (c != 0) {
+    // 存在读锁或者当前获取线程不是已经获取写锁的线程
+    if (w == 0 || current != getExclusiveOwnerThread())
+      return false;
+    if (w + exclusiveCount(acquires) > MAX_COUNT)
+      throw new Error("Maximum lock count exceeded");
+    setState(c + acquires);
+    return true;
+  }
+  if (writerShouldBlock() || !compareAndSetState(c, c + acquires)) {
+    return false;
+  }
+  setExclusiveOwnerThread(current);
+  return true;
+}
+}}}
+	
+	该方法除了重入条件（当前线程为获取了写锁的线程）之外，增加了一个读锁是否存在的判断。如果存在读锁，则写锁不能被获取，原因在于：读写锁要确保 写锁的操作对读锁可见，如果允许读锁在已被获取的情况下对写锁的获取，那么正在运行的其他读线程就无法感知到当前写线程的操作。因此只有等待其他读线程都 释放了读锁，写锁才能被当前线程所获取，而写锁一旦被获取，则其他读写线程的后续访问均被阻塞。
+	
+	写锁的释放与ReentrantLock的释放过程基本类似，每次释放均减少写状态，当写状态为0时表示写锁已被释放，从而等待的读写线程能够继续访问读写锁，同时前次写线程的修改对后续读写线程可见。
+	
+==== 读锁的获取与释放 ====
+	读锁是一个支持重进入的共享锁，它能够被多个线程同时获取，在没有其他写线程访问（或者写状态为0）时，读锁总会成功的被获取，而所做的也只是 （线程安全的）增加读状态。如果当前线程已经获取了读锁，则增加读状态。如果当前线程在获取读锁时，写锁已被其他线程获取，则进入等待状态。获取读锁的实 现从Java 5到Java 6变得复杂许多，主要原因是新增了一些功能，比如：getReadHoldCount()方法，返回当前线程获取读锁的次数。读状态是所有线程获取读锁次 数的总和，而每个线程各自获取读锁的次数只能选择保存在ThreadLocal中，由线程自身维护，这使获取读锁的实现变得复杂。因此，这里将获取读锁的 代码做了删减，保留必要的部分.
+{{{code: lang="java" linenumbers="True"
+protected final int tryAcquireShared(int unused) {
+  for (;;) {
+    int c = getState();
+    int nextc = c + (1 << 16);
+    if (nextc < c)
+      throw new Error("Maximum lock count exceeded");
+    if (exclusiveCount(c) != 0 && owner != Thread.currentThread())
+      return -1;
+    if (compareAndSetState(c, nextc))
+      return 1;
+  }
+}
+}}}
+	
+	在tryAcquireShared(int unused)方法中，如果其他线程已经获取了写锁，则当前线程获取读锁失败，进入等待状态。如果当前线程获取了写锁或者写锁未被获取，则当前线程(线程安全，依靠CAS保证)增加读状态，成功获取读锁。
+	
+	读锁的每次释放均（线程安全的，可能有多个读线程同时释放读锁）减少读状态，减少的值是(1 << 16)。
+	
+==== 锁降级 ====
+	锁降级指的是写锁降级成为读锁。如果当前线程拥有写锁，然后将其释放，最后再获取读锁，这种分段完成的过程不能称之为锁降级。锁降级是指把持住（当前拥有的）写锁，再获取到读锁，随后释放（先前拥有的）写锁的过程。
+	
+	接下来看一个锁降级的示例：因为数据不常变化，所以多个线程可以并发的进行数据处理，当数据变更后，当前线程如果感知到数据变化，则进行数据的准备工作，同时其他处理线程被阻塞，直到当前线程完成数据的准备工作.
+{{{code: lang="java" linenumbers="True"
+public void processData() {
+  readLock.lock();
+  if (!update) {
+    // 必须先释放读锁
+    readLock.unlock();
+    // 锁降级从写锁获取到开始
+    writeLock.lock();
+    try {
+      if (!update) {
+        // 准备数据的流程（略）
+        update = true;
+      }
+      readLock.lock();
+    } finally {
+      writeLock.unlock();
+    }
+    // 锁降级完成，写锁降级为读锁
+  }
+  try {
+    // 使用数据的流程（略）
+  } finally {
+    readLock.unlock();
+  }
+}
+}}}
+	
+
+
+==== RentrantReadWriteLock不支持锁升级 ====
+	RentrantReadWriteLock不支持锁升级（把持读锁、获取写锁，最后释放读锁的过程）。原因也是保证数据可见性，如果读锁已被多个线程获取，其中任意线程成功获取了写锁并更新了数据，则其更新对其他获取到读锁的线程不可见。
+
+
+
+===== ReentrantReadWriteLock =====
+	ReentrantReadWriteLock 是 Java 中用于控制读写的一个类。lock.readLock 方法用于获取一个读锁，而 lock.writeLock 方法用于获取一个写锁。读锁允许多个线程进行读取数据操作，但不允许修改操作。而写锁则不允许其他线程进行读和写操作。
+
+
+===== 读/写锁的Java实现 =====
+	* **读取 ** 没有线程正在做写操作，且没有线程在请求写操作。
+	* **写入** 没有线程正在做读写操作。
+	
+	**如果某个线程想要读取资源，只要没有线程正在对该资源进行写操作且没有线程请求对该资源的写操作即可。**
+	我们假设对写操作的请求比对读操作的请求更重要，就要提升写请求的优先级。此外，如果**读操作发生的比较频繁**，我们又没有提升写操作的优先级，那么就会产生“饥饿”现象。请求写操作的线程会一直阻塞，直到所有的读线程都从ReadWriteLock上解锁了。如果一直保证新线程的读操作权限，那么等待写操作的线程就会一直阻塞下去，结果就是发生“饥饿”。因此，只有当没有线程正在锁住ReadWriteLock进行写操作，且没有线程请求该锁准备执行写操作时，才能保证读操作继续。
+	
+	**当其它线程没有对共享资源进行读操作或者写操作时，某个线程就有可能获得该共享资源的写锁，进而对共享资源进行写操作。**有多少线程请求了写锁以及以何种顺序请求写锁并不重要，除非你想保证写锁请求的公平性。
+	
+	按照上面的叙述，简单的实现出一个读/写锁，代码如下
+	
+{{{code: lang="java" linenumbers="True"
+public class ReadWriteLock{
+	private int readers = 0;
+	private int writers = 0;
+	private int writeRequests = 0;
+
+	public synchronized void lockRead() 
+		throws InterruptedException{
+		while(writers > 0 || writeRequests > 0){
+			wait();
+		}
+		readers++;
+	}
+
+	public synchronized void unlockRead(){
+		readers--;
+		notifyAll();
+	}
+
+	public synchronized void lockWrite() 
+		throws InterruptedException{
+		writeRequests++;
+
+		while(readers > 0 || writers > 0){
+			wait();
+		}
+		writeRequests--;
+		writers++;
+	}
+
+	public synchronized void unlockWrite() 
+		throws InterruptedException{
+		writers--;
+		notifyAll();
+	}
+}
+}}}
+	
+	需要注意的是，在两个释放锁的方法（unlockRead，unlockWrite）中，都调用了notifyAll方法，而不是notify。要解释这个原因，我们可以想象下面一种情形：
+	
+	**如果有线程在等待获取读锁，同时又有线程在等待获取写锁。**如果这时其中一个等待读锁的线程被notify方法唤醒，但因为此时仍有请求写锁的线程存在（writeRequests>0），所以被唤醒的线程会再次进入阻塞状态。然而，等待写锁的线程一个也没被唤醒，就像什么也没发生过一样（译者注：信号丢失现象）。如果用的是notifyAll方法，所有的线程都会被唤醒，然后判断能否获得其请求的锁。
+	
+	用notifyAll还有一个好处。**如果有多个读线程在等待读锁且没有线程在等待写锁时，调用unlockWrite()后，所有等待读锁的线程都能立马成功获取读锁 —— 而不是一次只允许一个。**
+	
+
+===== 读/写锁的重入 =====
+	读/写锁的重入
+	
+	上面实现的读/写锁(ReadWriteLock) 是不可重入的，当一个已经持有写锁的线程再次请求写锁时，就会被阻塞。原因是已经有一个写线程了——就是它自己。此外，考虑下面的例子：
+	
+	1. **Thread 1 获得了读锁**
+	2. **Thread 2 请求写锁，但因为Thread 1 持有了读锁，所以写锁请求被阻塞。**
+	3. **Thread 1 再想请求一次读锁，但因为Thread 2处于请求写锁的状态，所以想再次获取读锁也会被阻塞。**
+	上面这种情形使用前面的ReadWriteLock就会被锁定——一种类似于死锁的情形。不会再有线程能够成功获取读锁或写锁了。
+	
+	为了让ReadWriteLock可重入，需要对它做一些改进。下面会分别处理读锁的重入和写锁的重入
+
+
+==== 读锁重入 ====
+
+	为了让ReadWriteLock的读锁可重入，我们要先为读锁重入建立规则：
+	
+	**要保证某个线程中的读锁可重入，要么满足获取读锁的条件（没有写或写请求），要么已经持有读锁（不管是否有写请求）。**
+	
+	要确定一个线程是否已经持有读锁，可以用一个map来存储已经持有读锁的线程以及对应线程获取读锁的次数，当需要判断某个线程能否获得读锁时，就利用map中存储的数据进行判断。
+	
+	下面是方法lockRead和unlockRead修改后的的代码：
+{{{code: lang="java" linenumbers="True"
+public class ReadWriteLock{
+	private Map<Thread, Integer> readingThreads =
+		new HashMap<Thread, Integer>();
+
+	private int writers = 0;
+	private int writeRequests = 0;
+
+	public synchronized void lockRead() 
+		throws InterruptedException{
+		Thread callingThread = Thread.currentThread();
+		while(! canGrantReadAccess(callingThread)){
+			wait();                                                                   
+		}
+
+		readingThreads.put(callingThread,
+			(getAccessCount(callingThread) + 1));
+	}
+
+	public synchronized void unlockRead(){
+		Thread callingThread = Thread.currentThread();
+		int accessCount = getAccessCount(callingThread);
+		if(accessCount == 1) { 
+			readingThreads.remove(callingThread); 
+		} else {
+			readingThreads.put(callingThread, (accessCount -1)); 
+		}
+		notifyAll();
+	}
+
+	private boolean canGrantReadAccess(Thread callingThread){
+		if(writers > 0) return false;
+		//只有在没有线程拥有写锁的情况下才允许读锁的重入。此外，重入的读锁比写锁优先级高。
+		if(isReaderUsing(callingThread) return true;
+		if(writeRequests > 0) return false;
+		
+		return true;
+	}
+
+	private int getReadAccessCount(Thread callingThread){
+		Integer accessCount = readingThreads.get(callingThread);
+		if(accessCount == null) return 0;
+		return accessCount.intValue();
+	}
+
+	private boolean isReaderUsing(Thread callingThread){
+		return readingThreads.get(callingThread) != null;
+	}
+}
+}}}
+	
+
+==== 写锁重入 ====
+	仅当一个线程已经持有写锁，才允许写锁重入（再次获得写锁）。下面是方法lockWrite和unlockWrite修改后的的代码。
+	
+{{{code: lang="java" linenumbers="True"
+public class ReadWriteLock{
+	private Map<Thread, Integer> readingThreads =
+		new HashMap<Thread, Integer>();
+
+	private int writeAccesses    = 0;
+	private int writeRequests    = 0;
+	private Thread writingThread = null;
+
+	public synchronized void lockWrite() 
+		throws InterruptedException{
+		writeRequests++;
+		Thread callingThread = Thread.currentThread();
+		while(!canGrantWriteAccess(callingThread)){
+			wait();
+		}
+		writeRequests--;
+		writeAccesses++;
+		writingThread = callingThread;
+	}
+
+	public synchronized void unlockWrite() 
+		throws InterruptedException{
+		writeAccesses--;
+		if(writeAccesses == 0){
+			writingThread = null;
+		}
+		notifyAll();
+	}
+
+	private boolean canGrantWriteAccess(Thread callingThread){
+		if(hasReaders()) return false;
+		if(writingThread == null)    return true;
+		if(!isWriterUsing(callingThread)) return false;
+		return true;
+	}
+
+	private boolean hasReaders(){
+		return readingThreads.size() > 0;
+	}
+
+	private boolean isWriterUsing(Thread callingThread){
+		return writingThread == callingThread;
+	}
+}
+}}}
+	
+	
+==== 读锁升级到写锁 ====
+	有时，我们希望一个拥有读锁的线程，也能获得写锁。想要允许这样的操作，要求这个线程是唯一一个拥有读锁的线程。writeLock()需要做点改动来达到这个目的：
+{{{code: lang="java" linenumbers="True"
+public class ReadWriteLock{
+	private Map<Thread, Integer> readingThreads =
+		new HashMap<Thread, Integer>();
+
+	private int writeAccesses    = 0;
+	private int writeRequests    = 0;
+	private Thread writingThread = null;
+
+	public synchronized void lockWrite() 
+		throws InterruptedException{
+		writeRequests++;
+		Thread callingThread = Thread.currentThread();
+		while(!canGrantWriteAccess(callingThread)){
+			wait();
+		}
+		writeRequests--;
+		writeAccesses++;
+		writingThread = callingThread;
+	}
+
+	public synchronized void unlockWrite() throws InterruptedException{
+		writeAccesses--;
+		if(writeAccesses == 0){
+			writingThread = null;
+		}
+		notifyAll();
+	}
+
+	private boolean canGrantWriteAccess(Thread callingThread){
+		if(isOnlyReader(callingThread)) return true;
+		if(hasReaders()) return false;
+		if(writingThread == null) return true;
+		if(!isWriter(callingThread)) return false;
+		return true;
+	}
+
+	private boolean hasReaders(){
+		return readingThreads.size() > 0;
+	}
+
+	private boolean isWriter(Thread callingThread){
+		return writingThread == callingThread;
+	}
+
+	private boolean isOnlyReader(Thread thread){
+		return readers == 1 && readingThreads.get(callingThread) != null;
+	}
+}
+}}}
+	
+
+
+==== 写锁降级到读锁 ====
+	有时拥有写锁的线程也希望得到读锁。如果一个线程拥有了写锁，那么自然其它线程是不可能拥有读锁或写锁了。所以对于一个拥有写锁的线程，再获得读锁，是不会有什么危险的。我们仅仅需要对上面canGrantReadAccess方法进行简单地修改：
+{{{code: lang="java" linenumbers="True"
+public class ReadWriteLock{
+	private boolean canGrantReadAccess(Thread callingThread){
+		if(isWriter(callingThread)) return true;
+		if(writingThread != null) return false;
+		if(isReader(callingThread) return true;
+		if(writeRequests > 0) return false;
+		return true;
+	}
+}
+}}}
+	
+	
+==== 在finally中调用unlock() ====
+	
+	在利用ReadWriteLock来保护临界区时，如果临界区可能抛出异常，在finally块中调用readUnlock()和writeUnlock()就显得很重要了。这样做是为了保证ReadWriteLock能被成功解锁，然后其它线程可以请求到该锁。这里有个例子：
+	
+{{{code: lang="java" linenumbers="True"
+lock.lockWrite();
+try{
+	//do critical section code, which may throw exception
+} finally {
+	lock.unlockWrite();
+}
+}}}
+	
+
+
+
+

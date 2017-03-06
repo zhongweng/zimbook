@@ -5,11 +5,18 @@ Creation-Date: 2017-02-27T09:40:27+08:00
 ====== java线程 ======
 Created 星期一 27 二月 2017
 
+	[[+基本概念]]
+	[[+java锁框架]]
+	[[+startAndRun区别]]
 	[[+synchronized同步]]
 	[[+volatile]]
 	[[+Lock接口]]
+	[[+ReadWriteLock]]
 	[[+等待通知]]
 	[[+Atom类]]
+	[[+ThreadLocal]]
+	[[+高级同步议题]]
+	
 
 		
 	

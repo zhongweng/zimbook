@@ -1,0 +1,297 @@
+Content-Type: text/x-zim-wiki
+Wiki-Format: zim 0.4
+Creation-Date: 2017-03-03T09:40:49+08:00
+
+====== 高级同步议题 ======
+Created 星期五 03 三月 2017
+
+===== 术语 =====
+	Barrier 屏障:barrier是多个Thread的集合点,所有的thread都应该到齐在这个barrie之后才能允许他们继续下去.
+	Condition variable 条件变量
+	Critical section 临界区:如synchronized method or block.
+	Event variable 事件变量
+	Lock
+	Monitor 监视器
+	Mutex 互斥
+	Reader/Writer Lock 读写锁
+	Semaphore 信号量
+	
+===== Semaphore 信号量 =====
+
+	信号量(Semaphore)，有时被称为信号灯，是在多线程环境下使用的一种设施, 它负责协调各个线程, 以保证它们能够正确、合理的使用公共资源。
+	
+			一个计数信号量。从概念上讲，信号量维护了一个许可集。如有必要，在许可可用前会阻塞每一个 acquire()，然后再获取该许可。每个 release() 添加一个许可，从而可能释放一个正在阻塞的获取者。但是，不使用实际的许可对象，Semaphore 只对可用许可的号码进行计数，并采取相应的行动。拿到信号量的线程可以进入代码，否则就等待。通过acquire()和release()获取和释放访问许可。
+	
+	**Semaphore分为单值和多值两种，前者只能被一个线程获得，后者可以被若干个线程获得。**
+	
+	在java中，还可以设置该信号量是否采用公平模式，如果以公平方式执行，则线程将会按到达的顺序（FIFO）执行，如果是非公平，则可以后请求的有可能排在队列的头部。
+	JDK中定义如下：
+			**Semaphore(int permits, boolean fair)**
+	**　　   创建具有给定的许可数和给定的公平设置的Semaphore。**
+	
+{{{code: lang="java" linenumbers="True"
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
+
+
+/**
+ * DateTime: 2015年1月1日 下午6:41:01
+ *
+ */
+public class SemaPhore {
+    public static void main(String[] args) {
+        // 线程池
+        ExecutorService exec = Executors.newCachedThreadPool();
+        // 只能5个线程同时访问
+        final Semaphore semp = new Semaphore(5);
+        // 模拟20个客户端访问
+        for (int index = 0; index < 50; index++) {
+            final int NO = index;
+            Runnable run = new Runnable() {
+                public void run() {
+                    try {
+                        // 获取许可
+                        semp.acquire();
+                        System.out.println("Accessing: " + NO);
+                        Thread.sleep((long) (Math.random() * 6000));
+                        // 访问完后，释放
+                        semp.release();
+                        //availablePermits()指的是当前信号灯库中有多少个可以被使用
+                        System.out.println("-----------------" + semp.availablePermits()); 
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            };
+            exec.execute(run);
+        }
+        // 退出线程池
+        exec.shutdown();
+    }
+}
+}}}
+	
+	
+	
+	实例:
+{{{code: lang="java" linenumbers="True"
+import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.locks.ReentrantLock;
+ 
+/**
+ * 信号量使用详解,使用信号量来管理有限的资源
+ * User: ketqi
+ * Date: 2013-01-27 12:29
+ */
+public class SemaphoreDemo {
+    /** 可重入锁,对资源列表进行同步 */
+    private final ReentrantLock lock = new ReentrantLock();
+    /** 信号量 */
+    private final Semaphore semaphore;
+    /** 可使用的资源列表 */
+    private final LinkedList<Object> resourceList = new LinkedList<Object>();
+ 
+    public SemaphoreDemo(Collection<Object> resourceList) {
+        this.resourceList.addAll(resourceList);
+        this.semaphore = new Semaphore(resourceList.size(), true);
+    }
+ 
+    /**
+     * 获取资源
+     *
+     * @return 可用的资源
+     * @throws InterruptedException
+     */
+    public Object acquire() throws InterruptedException {
+        semaphore.acquire();
+ 
+        lock.lock();
+        try {
+            return resourceList.pollFirst();
+        } finally {
+            lock.unlock();
+        }
+    }
+ 
+    /**
+     * 释放或者归还资源
+     *
+     * @param resource 待释放或归还的资源
+     */
+    public void release(Object resource) {
+        lock.lock();
+        try {
+            resourceList.addLast(resource);
+        } finally {
+            lock.unlock();
+        }
+ 
+        semaphore.release();
+    }
+ 
+    public static void main(String[] args) {
+        //准备2个可用资源
+        List<Object> resourceList = new ArrayList<>();
+        resourceList.add("Resource1");
+        resourceList.add("Resource2");
+ 
+        //准备工作任务
+        final SemaphoreDemo demo = new SemaphoreDemo(resourceList);
+        Runnable worker = new Runnable() {
+            @Override
+            public void run() {
+                Object resource = null;
+                try {
+                    //获取资源
+                    resource = demo.acquire();
+                    System.out.println(Thread.currentThread().getName() + "\twork   on\t" + resource);
+                    //用resource做工作
+                    Thread.sleep(1000);
+                    System.out.println(Thread.currentThread().getName() + "\tfinish on\t" + resource);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                } finally {
+                    //归还资源
+                    if (resource != null) {
+                        demo.release(resource);
+                    }
+                }
+            }
+        };
+ 
+        //启动9个任务
+        ExecutorService service = Executors.newCachedThreadPool();
+        for (int i = 0; i < 9; i++) {
+            service.submit(worker);
+        }
+        service.shutdown();
+    }
+}
+}}}
+	
+	
+===== CountDownLatch =====
+	CountDownLatch类位于java.util.concurrent包下，利用它可以实现类似计数器的功能。比如有一个任务A，它要等待其他4个任务执行完毕之后才能执行，此时就可以利用CountDownLatch来实现这种功能了。
+	
+{{{code: lang="java" linenumbers="True"
+public CountDownLatch(int count) {  };  //参数count为计数值
+public void await() throws InterruptedException { };   //调用await()方法的线程会被挂起，它会等待直到count值为0才继续执行
+public boolean await(long timeout, TimeUnit unit) throws InterruptedException { };  //和await()类似，只不过等待一定的时间后count值还没变为0的话就会继续执行
+public void countDown() { };  //将count值减
+
+}}}
+	
+					{{{code: lang="java" linenumbers="True"
+public class Test {
+	 public static void main(String[] args) {   
+		 final CountDownLatch latch = new CountDownLatch(2);
+          
+		 new Thread(){
+			 public void run() {
+				 try {
+					 System.out.println("子线程"+Thread.currentThread().getName()+"正在执行");
+					Thread.sleep(3000);
+					System.out.println("子线程"+Thread.currentThread().getName()+"执行完毕");
+					latch.countDown();
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			 };
+		 }.start();
+          
+		 new Thread(){
+			 public void run() {
+				 try {
+					 System.out.println("子线程"+Thread.currentThread().getName()+"正在执行");
+					 Thread.sleep(3000);
+					 System.out.println("子线程"+Thread.currentThread().getName()+"执行完毕");
+					 latch.countDown();
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			 };
+		 }.start();
+          
+		 try {
+			 System.out.println("等待2个子线程执行完毕...");
+			latch.await();
+			System.out.println("2个子线程已经执行完毕");
+			System.out.println("继续执行主线程");
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+	 }
+}
+}}}
+
+
+===== CyclicBarrier =====
+
+	字面意思回环屏障，通过它可以实现让一组线程等待至某个状态之后再全部同时执行。叫做回环是因为当所有等待线程都被释放以后，CyclicBarrier可以被重用。我们暂且把这个状态就叫做barrier，当调用await()方法之后，线程就处于barrier了。
+	
+{{{code: lang="java" linenumbers="True"
+public CyclicBarrier(int parties, Runnable barrierAction) {
+}
+ 
+public CyclicBarrier(int parties) {
+}
+//起当前线程，直至所有线程都到达barrier状态再同时执行后续任务；
+public int await() throws InterruptedException, BrokenBarrierException { };
+//让这些线程等待至一定的时间，如果还有线程没有到达barrier状态就直接让到达barrier的线程执行后续任务。
+public int await(long timeout, TimeUnit unit)throws InterruptedException,BrokenBarrierException,TimeoutException { };
+}}}
+	
+	
+	假若有若干个线程都要进行写数据操作，并且只有所有线程都完成写数据操作之后，这些线程才能继续做后面的事情，此时就可以利用CyclicBarrier了：
+{{{code: lang="java" linenumbers="True"
+public class Test {
+    public static void main(String[] args) {
+        int N = 4;
+        CyclicBarrier barrier  = new CyclicBarrier(N);
+        for(int i=0;i<N;i++)
+            new Writer(barrier).start();
+    }
+    static class Writer extends Thread{
+        private CyclicBarrier cyclicBarrier;
+        public Writer(CyclicBarrier cyclicBarrier) {
+            this.cyclicBarrier = cyclicBarrier;
+        }
+ 
+        @Override
+        public void run() {
+            System.out.println("线程"+Thread.currentThread().getName()+"正在写入数据...");
+            try {
+                Thread.sleep(5000);      //以睡眠来模拟写入数据操作
+                System.out.println("线程"+Thread.currentThread().getName()+"写入数据完毕，等待其他线程写入完毕");
+                cyclicBarrier.await();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }catch(BrokenBarrierException e){
+                e.printStackTrace();
+            }
+            System.out.println("所有线程写入完毕，继续处理其他任务...");
+        }
+    }
+}
+}}}
+	
+
+
+===== 总结 =====
+	CountDownLatch和CyclicBarrier都能够实现线程之间的等待，只不过它们侧重点不同：
+		**CountDownLatch一般用于某个线程A等待若干个其他线程执行完任务之后，它才执行；**
+		**而CyclicBarrier一般用于一组线程互相等待至某个状态，然后这一组线程再同时执行；**
+		**另外，CountDownLatch是不能够重用的，而CyclicBarrier是可以重用的。**
+	**Semaphore其实和锁有点类似，它一般用于控制对某组资源的访问权限。**
+
+
+
+
+
+
+
+

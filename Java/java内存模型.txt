@@ -1,0 +1,11 @@
+Content-Type: text/x-zim-wiki
+Wiki-Format: zim 0.4
+Creation-Date: 2017-03-04T20:36:01+08:00
+
+====== java内存模型 ======
+Created 星期六 04 三月 2017
+
+	[[+happens-before]] 
+	[[+重排序]]
+	[[+DoubleCheckLock]]
+	
