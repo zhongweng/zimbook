@@ -1,0 +1,554 @@
+Content-Type: text/x-zim-wiki
+Wiki-Format: zim 0.4
+Creation-Date: 2017-03-07T09:52:57+08:00
+
+====== Map ======
+Created 星期二 07 三月 2017
+
+===== HashMap =====
+
+===== 前提 =====
+	有以下几个关键点：
+	
+	* **hashCode的存在主要是用于查找的快捷性，如Hashtable，HashMap等，hashCode是用来在散列存储结构中确定对象的存储地址的；**
+	* **如果两个对象相同，就是适用于equals(java.lang.Object) 方法，那么这两个对象的hashCode一定要相同；**
+	* **如果对象的equals方法被重写，那么对象的hashCode也尽量重写，并且产生hashCode使用的对象，一定要和equals方法中使用的一致，否则就会违反上面提到的第2点；**
+	* **两个对象的hashCode相同，并不一定表示两个对象就相同，也就是不一定适用于equals(java.lang.Object) 方法，只能够说明这两个对象在散列存储结构中，如Hashtable，他们“存放在同一个篮子里”。**
+	
+	再归纳一下就是hashCode是用于查找使用的，而equals是用于比较两个对象的是否相等的。以下这段话是从别人帖子回复拷贝过来的：
+		1.hashcode是用来查找的，如果你学过数据结构就应该知道，在查找和排序这一章有
+		例如内存中有这样的位置
+		0 1 2 3 4 5 6 7
+		而我有个类，这个类有个字段叫ID,我要把这个类存放在以上8个位置之一，如果不用hashcode而任意存放，那么当查找时就需要到这八个位置里挨个去找，或者用二分法一类的算法。
+		但如果用hashcode那就会使效率提高很多。
+		我们这个类中有个字段叫ID,那么我们就定义我们的hashcode为ID％8，然后把我们的类存放在取得得余数那个位置。比如我们的ID为9，9除8的余数为1，那么我们就把该类存在1这个位置，如果ID是13，求得的余数是5，那么我们就把该类放在5这个位置。这样，以后在查找该类时就可以通过ID除 8求余数直接找到存放的位置了。
+		
+		2.但是如果两个类有相同的hashcode怎么办那（我们假设上面的类的ID不是唯一的），例如9除以8和17除以8的余数都是1，那么这是不是合法的，回答是：可以这样。那么如何判断呢？在这个时候就需要定义 equals了。
+		也就是说，我们先通过 hashcode来判断两个类是否存放某个桶里，但这个桶里可能有很多类，那么我们就需要再通过 equals 来在这个桶里找到我们要的类。
+		那么。重写了equals()，为什么还要重写hashCode()呢？
+		想想，你要在一个桶里找东西，你必须先要找到这个桶啊，你不通过重写hashcode()来找到桶，光重写equals()有什么用啊
+
+
+==== 设计理念 ====
+	哈希表（hash table）
+	HashMap是一种基于哈希表（hash table）实现的map，哈希表（也叫关联数组）一种通用的数据结构，大多数的现代语言都原生支持，其概念也比较简单：key经过hash函数作用后得到一个槽（buckets或slots）的索引（index），槽中保存着我们想要获取的值，如下图所示
+	{{./pasted_image.png}}
+	很容易想到，一些不同的key经过同一hash函数后可能产生相同的索引，也就是产生了冲突，这是在所难免的。
+	所以利用哈希表这种数据结构实现具体类时，需要：
+	
+	* 设计个好的hash函数，使冲突尽可能的减少
+	* 其次是需要解决发生冲突后如何处理。
+	后面会重点介绍HashMap是如何解决这两个问题的。
+	
+	HashMap的一些特点:
+	* 线程非安全，并且允许key与value都为null值，HashTable与之相反，为线程安全，key与value都不允许null值。
+	* 不保证其内部元素的顺序，而且随着时间的推移，同一元素的位置也可能改变（resize的情况）
+	* put、get操作的时间复杂度为O(1)。
+	* 遍历其集合视角的时间复杂度与其容量（capacity，槽的个数）和现有元素的大小（entry的个数）成正比，所以如果遍历的性能要求很高，不要把capactiy设置的过高或把平衡因子（load factor，当entry数大于capacity*loadFactor时，会进行resize，reside会导致key进行rehash）设置的过低。
+	* 由于HashMap是线程非安全的，这也就是意味着如果多个线程同时对一hashmap的集合试图做迭代时有结构的上改变（添加、删除entry，只改变entry的value的值不算结构改变），那么会报ConcurrentModificationException，专业术语叫fail-fast，尽早报错对于多线程程序来说是很有必要的。
+	* Map m = Collections.synchronizedMap(new HashMap(...)); 通过这种方式可以得到一个线程安全的map。
+
+
+==== 源码分析 ====
+	首先从构造函数开始讲，HashMap遵循集合框架的约束，提供了一个参数为空的构造函数与有一个参数且参数类型为Map的构造函数。除此之外，还提供了两个构造函数，用于设置**HashMap的容量（capacity）**与**平衡因子（loadFactor）。**
+{{{code: lang="java" linenumbers="True"
+public HashMap(int initialCapacity, float loadFactor) {
+    if (initialCapacity < 0)
+        throw new IllegalArgumentException("Illegal initial capacity: " +
+                                           initialCapacity);
+    if (initialCapacity > MAXIMUM_CAPACITY)
+        initialCapacity = MAXIMUM_CAPACITY;
+    if (loadFactor <= 0 || Float.isNaN(loadFactor))
+        throw new IllegalArgumentException("Illegal load factor: " +
+                                           loadFactor);
+    this.loadFactor = loadFactor;
+    threshold = initialCapacity;
+    init();
+}
+public HashMap(int initialCapacity) {
+    this(initialCapacity, DEFAULT_LOAD_FACTOR);
+}
+public HashMap() {
+    this(DEFAULT_INITIAL_CAPACITY, DEFAULT_LOAD_FACTOR);
+}
+}}}
+	
+	容量与平衡因子都有个默认值，并且容量有个最大值
+	/**
+	 * The default initial capacity - MUST be a power of two.
+	 */
+	**static final int DEFAULT_INITIAL_CAPACITY = 1 << 4; // aka 16**
+	/**
+	 * The maximum capacity, used if a higher value is implicitly specified
+	 * by either of the constructors with arguments.
+	 * MUST be a power of two <= 1<<30.
+	 */
+	**static final int MAXIMUM_CAPACITY = 1 << 30;**
+	/**
+	 * The load factor used when none specified in constructor.
+	 */
+	**static final float DEFAULT_LOAD_FACTOR = 0.75f;**
+
+	可以看到，默认的平衡因子为0.75，这是权衡了时间复杂度与空间复杂度之后的最好取值（JDK说是最好的😂），过高的因子会降低存储空间但是查找（lookup，包括HashMap中的put与get方法）的时间就会增加。
+	这里比较奇怪的是问题：**容量必须为2的指数倍（默认为16），这是为什么呢**？解答这个问题，需要了解HashMap中哈希函数的设计原理。
+
+
+=== 两个重要的参数 ===
+	Initial capacity The capacity is the number of buckets in the hash table, The initial capacity is simply the capacity at the time the hash table is created.
+	Load factor The load factor is a measure of how full the hash table is allowed to get before its capacity is automatically increased.
+	简单的说，Capacity就是bucket的大小，Load factor就是bucket填满程度的最大比例。如果对迭代性能要求很高的话不要把capacity设置过大，也不要把load factor设置过小。
+	当bucket中的entries的数目大于capacity*load factor时就需要调整bucket的大小为当前的2倍。
+
+
+=== put函数的实现 ===
+	put函数大致的思路为：
+	* 对key的hashCode()做hash，然后再计算index;
+	* 如果没碰撞直接放到bucket里；
+	* 如果碰撞了，以链表的形式存在buckets后；
+	* 如果碰撞导致链表过长(大于等于TREEIFY_THRESHOLD)，就把链表转换成红黑树；
+	* 如果节点已经存在就替换old value(保证key的唯一性)
+	* 如果bucket满了(超过load factor*current capacity)，就要resize。
+	具体代码的实现如下：
+{{{code: lang="java" linenumbers="True"
+public V put(K key, V value) {
+    // 对key的hashCode()做hash
+    return putVal(hash(key), key, value, false, true);
+}
+
+final V putVal(int hash, K key, V value, boolean onlyIfAbsent,
+               boolean evict) {
+    Node<K,V>[] tab; Node<K,V> p; int n, i;
+    // tab为空则创建
+    if ((tab = table) == null || (n = tab.length) == 0)
+        n = (tab = resize()).length;
+    // 计算index，并对null做处理
+    if ((p = tab[i = (n - 1) & hash]) == null)
+        tab[i] = newNode(hash, key, value, null);
+    else {
+        Node<K,V> e; K k;
+        // 节点存在
+        if (p.hash == hash &&
+            ((k = p.key) == key || (key != null && key.equals(k))))
+            e = p;
+        // 该链为树
+        else if (p instanceof TreeNode)
+            e = ((TreeNode<K,V>)p).putTreeVal(this, tab, hash, key, value);
+        // 该链为链表
+        else {
+            for (int binCount = 0; ; ++binCount) {
+                if ((e = p.next) == null) {
+                    p.next = newNode(hash, key, value, null);
+                    if (binCount >= TREEIFY_THRESHOLD - 1) // -1 for 1st
+                        treeifyBin(tab, hash);
+                    break;
+                }
+                if (e.hash == hash &&
+                    ((k = e.key) == key || (key != null && key.equals(k))))
+                    break;
+                p = e;
+            }
+        }
+        // 写入
+        if (e != null) { // existing mapping for key
+            V oldValue = e.value;
+            if (!onlyIfAbsent || oldValue == null)
+                e.value = value;
+            afterNodeAccess(e);
+            return oldValue;
+        }
+    }
+    ++modCount;
+    // 超过load factor*current capacity，resize
+    if (++size > threshold)
+        resize();
+    afterNodeInsertion(evict);
+    return null;
+}
+}}}
+	
+
+=== get函数的实现 ===
+	在理解了put之后，get就很简单了。大致思路如下：
+	* bucket里的第一个节点，直接命中；
+	* 如果有冲突，则通过key.equals(k)去查找对应的entry
+	* 若为树，则在树中通过key.equals(k)查找，O(logn)；
+	* 若为链表，则在链表中通过key.equals(k)查找，O(n)。
+	具体代码的实现如下：
+{{{code: lang="java" linenumbers="True"
+public V get(Object key) {
+    Node<K,V> e;
+    return (e = getNode(hash(key), key)) == null ? null : e.value;
+}
+
+final Node<K,V> getNode(int hash, Object key) {
+    Node<K,V>[] tab; Node<K,V> first, e; int n; K k;
+    if ((tab = table) != null && (n = tab.length) > 0 &&
+        (first = tab[(n - 1) & hash]) != null) {
+        // 直接命中
+        if (first.hash == hash && // always check first node
+            ((k = first.key) == key || (key != null && key.equals(k))))
+            return first;
+        // 未命中
+        if ((e = first.next) != null) {
+            // 在树中get
+            if (first instanceof TreeNode)
+                return ((TreeNode<K,V>)first).getTreeNode(hash, key);
+            // 在链表中get
+            do {
+                if (e.hash == hash &&
+                    ((k = e.key) == key || (key != null && key.equals(k))))
+                    return e;
+            } while ((e = e.next) != null);
+        }
+    }
+    return null;
+}
+}}}
+	
+
+
+=== hash函数的实现 ===
+	在get和put的过程中，计算下标时，先对hashCode进行hash操作，然后再通过hash值进一步计算下标，如下图所示：
+	{{./pasted_image003.png}}
+	
+	在对hashCode()计算hash时具体实现是这样的：
+		**static final int hash(Object key) {**
+		**    int h;**
+		**    return (key == null) ? 0 : (h = key.hashCode()) ^ (h >>> 16);**
+		**}**
+	可以看到这个函数大概的作用就是：高16bit不变，低16bit和高16bit做了一个异或。
+	在设计hash函数时，因为目前的table长度n为2的幂，而计算下标的时候，是这样实现的(使用&位操作，而非%求余)：
+		**(n - 1) & hash**
+	设计者认为这方法很容易发生碰撞。为什么这么说呢？不妨思考一下，在n - 1为15(0x1111)时，其实散列真正生效的只是低4bit的有效位，当然容易碰撞了。
+	因此，设计者想了一个顾全大局的方法(综合考虑了速度、作用、质量)，就是把高16bit和低16bit异或了一下。设计者还解释到因为现在大多数的hashCode的分布已经很不错了，就算是发生了碰撞也用O(logn)的tree去做了。仅仅异或一下，既减少了系统的开销，也不会造成的因为高位没有参与下标的计算(table长度比较小时)，从而引起的碰撞。
+	如果还是产生了频繁的碰撞，会发生什么问题呢？作者注释说，他们使用树来处理频繁的碰撞(we use trees to handle large sets of collisions in bins)，在JEP-180中，描述了这个问题：
+		Improve the performance of java.util.HashMap under high hash-collision conditions by using balanced trees rather than linked lists to store map entries. Implement the same improvement in the LinkedHashMap class.
+	之前已经提过，在获取HashMap的元素时，基本分两步：
+		**首先根据hashCode()做hash，然后确定bucket的index；**
+		**如果bucket的节点的key不是我们需要的，则通过keys.equals()在链中找。**
+	在Java 8之前的实现中是用链表解决冲突的，在产生碰撞的情况下，进行get时，两步的时间复杂度是O(1)+O(n)。因此，当碰撞很厉害的时候n很大，O(n)的速度显然是影响速度的。
+	因此在Java 8中，利用红黑树替换链表，这样复杂度就变成了O(1)+O(logn)了，这样在n很大的时候，能够比较理想的解决这个问题，在Java 8：HashMap的性能提升一文中有性能测试的结果。
+
+
+=== resize的实现 ===
+	当put时，如果发现目前的bucket占用程度已经超过了Load Factor所希望的比例，那么就会发生resize。在resize的过程，简单的说就是把bucket扩充为2倍，之后重新计算index，把节点再放到新的bucket中。resize的注释是这样描述的：
+		**Initializes or doubles table size. If null, allocates in accord with initial capacity target held in field threshold. Otherwise, because we are using power-of-two expansion, the elements from each bin must either stay at same index, or move with a power of two offset in the new table.**
+	大致意思就是说，当超过限制的时候会resize，然而又因为我们使用的是2次幂的扩展(指长度扩为原来2倍)，所以，元素的位置要么是在原位置，要么是在原位置再移动2次幂的位置。
+	怎么理解呢？例如我们从16扩展为32时，具体的变化如下所示：
+	{{./pasted_image004.png}}
+	因此元素在重新计算hash之后，因为n变为2倍，那么n-1的mask范围在高位多1bit(红色)，因此新的index就会发生这样的变化：
+	{{./pasted_image005.png}}
+	因此，我们在扩充HashMap的时候，不需要重新计算hash，只需要看看原来的hash值新增的那个bit是1还是0就好了，是0的话索引没变，是1的话索引变成“原索引+oldCap”。可以看看下图为16扩充为32的resize示意图：
+	{{./pasted_image006.png}}
+	这个设计确实非常的巧妙，既省去了重新计算hash值的时间，而且同时，由于新增的1bit是0还是1可以认为是随机的，因此resize的过程，均匀的把之前的冲突的节点分散到新的bucket了。
+	下面是代码的具体实现：
+{{{code: lang="java" linenumbers="True"
+final Node<K,V>[] resize() {
+    Node<K,V>[] oldTab = table;
+    int oldCap = (oldTab == null) ? 0 : oldTab.length;
+    int oldThr = threshold;
+    int newCap, newThr = 0;
+    if (oldCap > 0) {
+        // 超过最大值就不再扩充了，就只好随你碰撞去吧
+        if (oldCap >= MAXIMUM_CAPACITY) {
+            threshold = Integer.MAX_VALUE;
+            return oldTab;
+        }
+        // 没超过最大值，就扩充为原来的2倍
+        else if ((newCap = oldCap << 1) < MAXIMUM_CAPACITY &&
+                 oldCap >= DEFAULT_INITIAL_CAPACITY)
+            newThr = oldThr << 1; // double threshold
+    }
+    else if (oldThr > 0) // initial capacity was placed in threshold
+        newCap = oldThr;
+    else {               // zero initial threshold signifies using defaults
+        newCap = DEFAULT_INITIAL_CAPACITY;
+        newThr = (int)(DEFAULT_LOAD_FACTOR * DEFAULT_INITIAL_CAPACITY);
+    }
+    // 计算新的resize上限
+    if (newThr == 0) {
+
+        float ft = (float)newCap * loadFactor;
+        newThr = (newCap < MAXIMUM_CAPACITY && ft < (float)MAXIMUM_CAPACITY ?
+                  (int)ft : Integer.MAX_VALUE);
+    }
+    threshold = newThr;
+    @SuppressWarnings({"rawtypes","unchecked"})
+        Node<K,V>[] newTab = (Node<K,V>[])new Node[newCap];
+    table = newTab;
+    if (oldTab != null) {
+        // 把每个bucket都移动到新的buckets中
+        for (int j = 0; j < oldCap; ++j) {
+            Node<K,V> e;
+            if ((e = oldTab[j]) != null) {
+                oldTab[j] = null;
+                if (e.next == null)
+                    newTab[e.hash & (newCap - 1)] = e;
+                else if (e instanceof TreeNode)
+                    ((TreeNode<K,V>)e).split(this, newTab, j, oldCap);
+                else { // preserve order
+                    Node<K,V> loHead = null, loTail = null;
+                    Node<K,V> hiHead = null, hiTail = null;
+                    Node<K,V> next;
+                    do {
+                        next = e.next;
+                        // 原索引
+                        if ((e.hash & oldCap) == 0) {
+                            if (loTail == null)
+                                loHead = e;
+                            else
+                                loTail.next = e;
+                            loTail = e;
+                        }
+                        // 原索引+oldCap
+                        else {
+                            if (hiTail == null)
+                                hiHead = e;
+                            else
+                                hiTail.next = e;
+                            hiTail = e;
+                        }
+                    } while ((e = next) != null);
+                    // 原索引放到bucket里
+                    if (loTail != null) {
+                        loTail.next = null;
+                        newTab[j] = loHead;
+                    }
+                    // 原索引+oldCap放到bucket里
+                    if (hiTail != null) {
+                        hiTail.next = null;
+                        newTab[j + oldCap] = hiHead;
+                    }
+                }
+            }
+        }
+    }
+    return newTab;
+}
+}}}
+	
+	
+
+=== 哈希函数的设计原理 ===
+{{{code: lang="java" linenumbers="True"
+
+}}}
+	
+	在哈希表容量（也就是buckets或slots大小）为length的情况下，为了使每个key都能在冲突最小的情况下映射到[0,length)（注意是左闭右开区间）的索引（index）内，一般有两种做法：
+	
+	* **让length为素数，然后用hashCode(key) mod length的方法得到索引**
+	* **让length为2的指数倍，然后用hashCode(key) & (length-1)的方法得到索引**
+	HashTable用的是方法1，HashMap用的是方法2。
+	重点说说方法2的情况，方法2其实也比较好理解：
+	
+	**因为length为2的指数倍，所以length-1所对应的二进制位都为1，然后在与hashCode(key)做与运算，即可得到[0,length)内的索引**
+	
+	但是这里有个问题，如果hashCode(key)的大于length的值，而且hashCode(key)的二进制位的低位变化不大，那么冲突就会很多，举个例子：
+	
+	Java中对象的哈希值都32位整数，而HashMap默认大小为16，那么有两个对象那么的哈希值分别为：0xABAB0000与0xBABA0000，它们的后几位都是一样，那么与16异或后得到结果应该也是一样的，也就是产生了冲突。
+	
+	造成冲突的原因关键在于16限制了只能用低位来计算，高位直接舍弃了，所以我们需要额外的哈希函数而不只是简单的对象的hashCode方法了。
+	具体来说，就是HashMap中hash函数干的事了
+	
+	**首先有个随机的hashSeed，来降低冲突发生的几率**
+	**然后如果是字符串，用了sun.misc.Hashing.stringHash32((String) k);来获取索引值**
+	**最后，通过一系列无符号右移操作，来把高位与低位进行异或操作，来降低冲突发生的几率**
+
+	HashMap.Entry
+
+	HashMap中存放的是HashMap.Entry对象，它继承自Map.Entry，其比较重要的是构造函数
+{{{code: lang="java" linenumbers="True"
+static class Entry<K,V> implements Map.Entry<K,V> {
+    final K key;
+    V value;
+    Entry<K,V> next;
+    int hash;
+    Entry(int h, K k, V v, Entry<K,V> n) {
+        value = v;
+        next = n;
+        key = k;
+        hash = h;
+    }
+    // setter, getter, equals, toString 方法省略
+    public final int hashCode() {
+        //用key的hash值与上value的hash值作为Entry的hash值
+        return Objects.hashCode(getKey()) ^ Objects.hashCode(getValue());
+    }
+    /**
+     * This method is invoked whenever the value in an entry is
+     * overwritten by an invocation of put(k,v) for a key k that's already
+     * in the HashMap.
+     */
+    void recordAccess(HashMap<K,V> m) {
+    }
+    /**
+     * This method is invoked whenever the entry is
+     * removed from the table.
+     */
+    void recordRemoval(HashMap<K,V> m) {
+    }
+}
+}}}
+	
+
+	可以看到，Entry实现了单向链表的功能，用next成员变量来级连起来。
+	
+	介绍完Entry对象，下面要说一个比较重要的成员变量
+	/**
+	 * The table, resized as necessary. Length MUST Always be a power of two.
+	 */
+	//HashMap内部维护了一个为数组类型的Entry变量table，用来保存添加进来的Entry对象
+	transient Entry<K,V>[] table = (Entry<K,V>[]) EMPTY_TABLE;
+	
+	你也许会疑问，Entry不是单向链表嘛，怎么这里又需要个数组类型的table呢？
+	我翻了下之前的算法书，其实这是解决冲突的一个方式：链地址法（开散列法），效果如下：
+	{{./pasted_image001.png}}
+	
+	**我们在机器A上算出对象A的哈希值与索引，然后把它插入到HashMap中，然后把该HashMap序列化后，在机器B上重新算对象的哈希值与索引，这与机器A上算出的是不一样的，所以我们在机器B上get对象A时，会得到错误的结果**
+	**所以说，当序列化一个HashMap对象时，保存Entry的table是不需要序列化进来的，因为它在另一台机器上是错误的**。
+	
+
+=== Fail-Fast 机制 ===
+	我们知道 java.util.HashMap 不是线程安全的，因此如果在使用迭代器的过程中有其他线程修改了 map，那么将抛出 ConcurrentModificationException，这就是所谓 fail-fast 策略。
+	
+	ail-fast 机制是 java 集合(Collection)中的一种错误机制。 当多个线程对同一个集合的内容进行操作时，就可能会产生 fail-fast 事件。
+	
+	例如：当某一个线程 A 通过 iterator去遍历某集合的过程中，若该集合的内容被其他线程所改变了；那么线程 A 访问集合时，就会抛出 ConcurrentModificationException 异常，产生 fail-fast 事件。
+	
+	这一策略在源码中的实现是通过 **modCount 域，modCount 顾名思义就是修改次数**，对 HashMap 内容（当然不仅仅是 HashMap 才会有，其他例如 ArrayList 也会）的修改都将增加这个值（大家可以再回头看一下其源码，在很多操作中都有 modCount++ 这句），那么在迭代器初始化过程中会将这个值赋给迭代器的 expectedModCount。
+{{{code: lang="java" linenumbers="True"
+HashIterator() {
+    expectedModCount = modCount;
+    if (size > 0) { // advance to first entry
+    Entry[] t = table;
+    while (index < t.length && (next = t[index++]) == null)  
+        ;
+    }
+}
+}}}
+	
+	在迭代过程中，判断 modCount 跟 expectedModCount 是否相等，如果不相等就表示已经有其他线程修改了 Map：
+	
+	注意到 modCount 声明为 volatile，保证线程之间修改的可见性。
+	**final Entry<K,V> nextEntry() {**
+	**    if (modCount != expectedModCount)**
+	**        throw new ConcurrentModificationException();**
+
+
+
+
+=== 总结 ===
+	我们现在可以回答开始的几个问题，加深对HashMap的理解：
+	1. **什么时候会使用HashMap？他有什么特点？**
+	是基于Map接口的实现，存储键值对时，它可以接收null的键值，是非同步的，HashMap存储着Entry(hash, key, value, next)对象。
+	2. **你知道HashMap的工作原理吗？**
+	通过hash的方法，通过put和get存储和获取对象。存储对象时，我们将K/V传给put方法时，它调用hashCode计算hash从而得到bucket位置，进一步存储，HashMap会根据当前bucket的占用情况自动调整容量(超过Load Facotr则resize为原来的2倍)。获取对象时，我们将K传给get，它调用hashCode计算hash从而得到bucket位置，并进一步调用equals()方法确定键值对。如果发生碰撞的时候，Hashmap通过链表将产生碰撞冲突的元素组织起来，在Java 8中，如果一个bucket中碰撞冲突的元素超过某个限制(默认是8)，则使用红黑树来替换链表，从而提高速度。
+	3. **你知道get和put的原理吗？equals()和hashCode()的都有什么作用？**
+	通过对key的hashCode()进行hashing，并计算下标( n-1 & hash)，从而获得buckets的位置。如果产生碰撞，则利用key.equals()方法去链表或树中去查找对应的节点
+	4. **你知道hash的实现吗？为什么要这样实现？**
+	在Java 1.8的实现中，是通过hashCode()的高16位异或低16位实现的：(h = k.hashCode()) ^ (h >>> 16)，主要是从速度、功效、质量来考虑的，这么做可以在bucket的n比较小的时候，也能保证考虑到高低bit都参与到hash的计算中，同时不会有太大的开销。
+	5. **如果HashMap的大小超过了负载因子(load factor)定义的容量，怎么办？**
+	如果超过了负载因子(默认0.75)，则会重新resize一个原来长度两倍的HashMap，并且重新调用hash方法。
+	
+	HashMap共有四个构造方法。构造方法中提到了两个很重要的参数：初始容量和加载因子。这两个参数是影响HashMap性能的重要参数，其中容量表示哈希表中槽的数量（即哈希数组的长度），**初始容量是创建哈希表时的容量（从构造函数中可以看出，如果不指明，则默认为16），加载因子是哈希表在其容量自动增加之前可以达到多满的一种尺度，当哈希表中的条目数超出了加载因子与当前容量的乘积时，则要对该哈希表进行 resize 操作（即扩容）**。
+	下面说下加载因子，如果加载因子越大，对空间的利用更充分，但是查找效率会降低（链表长度会越来越长）；如果加载因子太小，那么表中的数据将过于稀疏（很多空间还没用，就开始扩容了），对空间造成严重浪费。如果我们在构造方法中不指定，则系统默认加载因子为0.75，这是一个比较理想的值，一般情况下我们是无需修改的。
+	另外，无论我们指定的容量为多少，构造方法都会将实际容量设为不小于指定容量的2的次方的一个数，且最大值不能超过2的30次方
+	
+	HashMap中key和value都允许为null。
+	**如果key为null，则直接从哈希表的第一个位置table[0]对应的链表上查找**。记住，key为null的键值对永远都放在以table[0]为头结点的链表中，当然不一定是存放在头结点table[0]中。
+
+
+===== LinkedHashMap =====
+	public class LinkedHashMap<K,V>
+		extends HashMap<K,V>
+		implements Map<K,V>
+
+{{{code: lang="java" linenumbers="True"
+LinkedHashMap<String, Integer> lmap = new LinkedHashMap<String, Integer>();
+lmap.put("语文", 1);
+lmap.put("数学", 2);
+lmap.put("英语", 3);
+lmap.put("历史", 4);
+lmap.put("政治", 5);
+lmap.put("地理", 6);
+lmap.put("生物", 7);
+lmap.put("化学", 8);
+for(Entry<String, Integer> entry : lmap.entrySet()) {
+	System.out.println(entry.getKey() + ": " + entry.getValue());
+}
+}}}
+
+**LinkedHashMap的迭代输出的结果保持了插入顺序**。是什么样的结构使得LinkedHashMap具有如此特性呢？我们还是一样的看看LinkedHashMap的内部结构，对它有一个感性的认识：
+
+{{./pasted_image002.png}}
+
+
+===== WeakHashMap =====
+
+==== WeakHashMap简介 ====
+	WeakHashMap 继承于AbstractMap，实现了Map接口。
+		和HashMap一样，WeakHashMap 也是一个散列表，它存储的内容也是键值对(key-value)映射，而且键和值都可以是null。
+	   不过WeakHashMap的键是“弱键”。在 WeakHashMap 中，当某个键不再正常使用时，会被从WeakHashMap中被自动移除。更精确地说，对于一个给定的键，其映射的存在并不阻止垃圾回收器对该键的丢弃，这就使该键成为可终止的，被终止，然后被回收。某个键被终止时，它对应的键值对也就从映射中有效地移除了。
+		这个“弱键”的原理呢？大致上就是，**通过WeakReference和ReferenceQueue实现的。 WeakHashMap的key是“弱键”，即是WeakReference类型的；ReferenceQueue是一个队列，它会保存被GC回收的“弱键”。**实现步骤是：
+		**(01) 新建WeakHashMap，将“键值对”添加到WeakHashMap中。**
+	**           实际上，WeakHashMap是通过数组table保存Entry(键值对)；每一个Entry实际上是一个单向链表，即Entry是键值对链表。**
+	**   (02) 当某“弱键”不再被其它对象引用，并被GC回收时。在GC回收该“弱键”时，这个“弱键”也同时会被添加到ReferenceQueue(queue)队列中。**
+	**   (03) 当下一次我们需要操作WeakHashMap时，会先同步table和queue。table中保存了全部的键值对，而queue中保存被GC回收的键值对；同步它们，就是删除table中被GC回收的键值对。**
+	   这就是“弱键”如何被自动从WeakHashMap中删除的步骤了。
+	
+	和HashMap一样，WeakHashMap是不同步的。可以使用 Collections.synchronizedMap 方法来构造同步的 WeakHashMap。
+
+
+==== WeakHashMap数据结构 ====
+		{{./pasted_image007.png}}
+	从图中可以看出：
+	(01) WeakHashMap继承于AbstractMap，并且实现了Map接口。
+	(02) WeakHashMap是哈希表，但是它的键是"弱键"。WeakHashMap中保护几个重要的成员变量：table, size, threshold, loadFactor, modCount, queue。
+	　　table是一个Entry[]数组类型，而Entry实际上就是一个单向链表。哈希表的"key-value键值对"都是存储在Entry数组中的。 
+	　　size是Hashtable的大小，它是Hashtable保存的键值对的数量。 
+	　　threshold是Hashtable的阈值，用于判断是否需要调整Hashtable的容量。threshold的值="容量*加载因子"。
+	　　loadFactor就是加载因子。 
+	　　modCount是用来实现fail-fast机制的
+	　　queue保存的是“已被GC清除”的“弱引用的键”。
+
+
+
+===== TreeMap =====
+
+==== TreeMap 简介 ====
+	TreeMap 是一个**有序的key-value**集合，它是**通过红黑树实现的**。
+	TreeMap 继承于AbstractMap，所以它是一个Map，即一个key-value集合。
+	TreeMap 实现了NavigableMap接口，意味着它支持一系列的**导航方法**。比如返回有序的key集合。
+	TreeMap 实现了Cloneable接口，意味着**它能被克隆**。
+	TreeMap 实现了java.io.Serializable接口，意味着它**支持序列化**。
+	
+	TreeMap**基于红黑树（Red-Black tree）实现**。该映射根据其键的自然顺序进行排序，或者根据创建映射时提供的 Comparator 进行排序，具体取决于使用的构造方法。
+	TreeMap的基本操作 **containsKey、get、put 和 remove 的时间复杂度是 log(n)** 。
+	另外，TreeMap是非同步的。 它的iterator 方法返回的迭代器是fail-fastl的。
+
+
+==== TreeMap的构造函数 ====
+	// 默认构造函数。使用该构造函数，TreeMap中的元素按照自然排序进行排列。
+	TreeMap()
+	
+	// 创建的TreeMap包含Map
+	TreeMap(Map<? extends K, ? extends V> copyFrom)
+	
+	// 指定Tree的比较器
+	TreeMap(Comparator<? super K> comparator)
+	
+	// 创建的TreeSet包含copyFrom
+	TreeMap(SortedMap<K, ? extends V> copyFrom)
+	
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,86 @@
+Content-Type: text/x-zim-wiki
+Wiki-Format: zim 0.4
+Creation-Date: 2017-03-06T17:04:41+08:00
+
+====== LockSupport ======
+Created 星期一 06 三月 2017
+
+===== 介绍 =====
+	LockSupport是通过调用Unsafe函数中的接口实现阻塞和解除阻塞的。
+	LockSupport是用来创建锁和其他同步类的基本线程阻塞原语。 
+	**LockSupport中的park() 和 unpark() 的作用分别是阻塞线程和解除阻塞线程，而且park()和unpark()不会遇到“Thread.suspend 和 Thread.resume所可能引发的死锁”问题。**
+	**因为park() 和 unpark()有许可的存在**；调用 park() 的线程和另一个试图将其 unpark() 的线程之间的竞争将保持活性。
+	
+===== 函数列表 =====
+	// 返回提供给最近一次尚未解除阻塞的 park 方法调用的 blocker 对象，如果该调用不受阻塞，则返回 null。
+	static Object getBlocker(Thread t)
+	// 为了线程调度，禁用当前线程，除非许可可用。
+	static void park()
+	// 为了线程调度，在许可可用之前禁用当前线程。
+	static void park(Object blocker)
+	// 为了线程调度禁用当前线程，最多等待指定的等待时间，除非许可可用。
+	static void parkNanos(long nanos)
+	// 为了线程调度，在许可可用前禁用当前线程，并最多等待指定的等待时间。
+	static void parkNanos(Object blocker, long nanos)
+	// 为了线程调度，在指定的时限前禁用当前线程，除非许可可用。
+	static void parkUntil(long deadline)
+	// 为了线程调度，在指定的时限前禁用当前线程，除非许可可用。
+	static void parkUntil(Object blocker, long deadline)
+	// 如果给定线程的许可尚不可用，则使其可用。
+	static void unpark(Thread thread)
+	
+===== 实例 =====
+
+{{{code: lang="java" linenumbers="True"
+package TThread;
+
+import java.util.concurrent.locks.LockSupport;
+
+/**
+ * PrjName:JavaTest
+ * Descrip:
+ * <p>
+ * Modification History:
+ * Date                 Author      Version
+ * ==========================================
+ * 17-3-6 下午5:07
+ * info:
+ * _________________________________________
+ */
+public class TLockSupport {
+    private static Thread mainThread;
+
+    public static void main(String[] args){
+        ThreadA tha = new ThreadA("AAA");
+        mainThread = Thread.currentThread();
+
+        System.out.println("====main Thread");
+        tha.start();
+        System.out.println("====main blocking");
+        LockSupport.park(mainThread);
+
+        System.out.println("====main Begin");
+
+    }
+
+    static class ThreadA extends Thread {
+        public ThreadA(String name) {
+            super(name);
+        }
+
+        public void run() {
+            System.out.println("====Thread :"+Thread.currentThread().getName());
+            try {
+                Thread.sleep(5000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }finally {
+
+                LockSupport.unpark(mainThread);
+            }
+        }
+    }
+}
+}}}
+	
+	

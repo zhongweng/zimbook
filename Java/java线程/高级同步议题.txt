@@ -16,6 +16,7 @@ Created 星期五 03 三月 2017
 	Reader/Writer Lock 读写锁
 	Semaphore 信号量
 	
+
 ===== Semaphore 信号量 =====
 
 	信号量(Semaphore)，有时被称为信号灯，是在多线程环境下使用的一种设施, 它负责协调各个线程, 以保证它们能够正确、合理的使用公共资源。
@@ -174,6 +175,7 @@ public class SemaphoreDemo {
 }}}
 	
 	
+
 ===== CountDownLatch =====
 	CountDownLatch类位于java.util.concurrent包下，利用它可以实现类似计数器的功能。比如有一个任务A，它要等待其他4个任务执行完毕之后才能执行，此时就可以利用CountDownLatch来实现这种功能了。
 	
@@ -185,7 +187,8 @@ public void countDown() { };  //将count值减
 
 }}}
 	
-					{{{code: lang="java" linenumbers="True"
+{{{code: lang="java" linenumbers="True"
+
 public class Test {
 	 public static void main(String[] args) {   
 		 final CountDownLatch latch = new CountDownLatch(2);
@@ -227,6 +230,7 @@ public class Test {
 	 }
 }
 }}}
+
 
 
 ===== CyclicBarrier =====

@@ -1,0 +1,114 @@
+Content-Type: text/x-zim-wiki
+Wiki-Format: zim 0.4
+Creation-Date: 2017-03-06T16:31:39+08:00
+
+====== 优先级与守护线程 ======
+Created 星期一 06 三月 2017
+
+
+===== 线程的优先级 =====
+	java 中的线程优先级的范围是1～10，默认的优先级是5。“高优先级线程”会优先于“低优先级线程”执行。
+	
+	java 中有两种线程：**用户线程和守护线程**。可以通过isDaemon()方法来区别它们：如果返回false，则说明该线程是“用户线程”；否则就是“守护线程”。
+	用户线程一般用户执行用户级任务，而守护线程也就是“后台线程”，一般用来执行后台任务。**需要注意的是：Java虚拟机在“用户线程”都结束后会后退出。**
+	
+	
+	Every thread has a priority. Threads with higher priority are executed in preference to threads with lower priority. Each thread may or may not also be marked as a daemon. When code running in some thread creates a new Thread object, the new thread has its priority initially set equal to the priority of the creating thread, and is a daemon thread if and only if the creating thread is a daemon.
+	
+	When a Java Virtual Machine starts up, there is usually a single non-daemon thread (which typically calls the method named main of some designated class). The Java Virtual Machine continues to execute threads until either of the following occurs:
+	
+	The exit method of class Runtime has been called and the security manager has permitted the exit operation to take place.
+	All threads that are not daemon threads have died, either by returning from the call to the run method or by throwing an exception that propagates beyond the run method. 
+	Marks this thread as either a daemon thread or a user thread. The Java Virtual Machine exits when the only threads running are all daemon threads.
+	
+	翻译：
+	每个线程都有一个优先级。“高优先级线程”会优先于“低优先级线程”执行。每个线程都可以被标记为一个守护进程或非守护进程。在一些运行的主线程中创建新的子线程时，子线程的优先级被设置为等于“创建它的主线程的优先级”，当且仅当“创建它的主线程是守护线程”时“子线程才会是守护线程”。
+	
+	当Java虚拟机启动时，通常有一个单一的**非守护线程（该线程通过是通过main()方法启动）**。JVM会一直运行直到下面的任意一个条件发生，JVM就会终止运行：
+	**(01) 调用了exit()方法，并且exit()有权限被正常执行。**
+	**(02) 所有的“非守护线程”都死了(即JVM中仅仅只有“守护线程”)。**
+	每一个线程都被标记为“守护线程”或“用户线程”。**当只有守护线程运行时，JVM会自动退出。**
+	
+	
+===== 守护线程 =====
+	在Java中有两类线程：User Thread(用户线程)、Daemon Thread(守护线程) 
+	用个比较通俗的比如，任何一个守护线程都是整个JVM中所有非守护线程的保姆：
+	**只要当前JVM实例中尚存在任何一个非守护线程没有结束，守护线程就全部工作；只有当最后一个非守护线程结束时，守护线程随着JVM一同结束工作**。
+	Daemon的作用是为其他线程的运行提供便利服务，守护线程最典型的应用就是 GC (垃圾回收器)，它就是一个很称职的守护者。
+	**User和Daemon两者几乎没有区别，唯一的不同之处就在于虚拟机的离开：如果 User Thread已经全部退出运行了，只剩下Daemon Thread存在了，虚拟机也就退出了。 因为没有了被守护者，Daemon也就没有工作可做了，也就没有继续运行程序的必要了。**
+	
+	值得一提的是，守护线程并非只有虚拟机内部提供，用户在编写程序时也可以自己设置守护线程。下面的方法就是用来设置守护线程的。 
+
+{{{code: lang="java" linenumbers="True"
+//完成文件输出的守护线程任务  
+import java.io.*;     
+    
+class TestRunnable implements Runnable{     
+    public void run(){     
+               try{     
+                  Thread.sleep(1000);//守护线程阻塞1秒后运行     
+                  File f=new File("daemon.txt");     
+                  FileOutputStream os=new FileOutputStream(f,true);     
+                  os.write("daemon".getBytes());     
+           }     
+               catch(IOException e1){     
+          e1.printStackTrace();     
+               }     
+               catch(InterruptedException e2){     
+                  e2.printStackTrace();     
+           }     
+    }     
+}     
+public class TestDemo2{     
+    public static void main(String[] args) throws InterruptedException     
+    {     
+        Runnable tr=new TestRunnable();     
+        Thread thread=new Thread(tr);     
+                thread.setDaemon(true); //设置守护线程     
+        thread.start(); //开始执行分进程     
+    }     
+}     
+//运行结果：文件daemon.txt中没有"daemon"字符串。 
+//看到了吧，把输入输出逻辑包装进守护线程多么的可怕，字符串并没有写入指定文件。
+//原因也很简单，直到主线程完成，守护线程仍处于1秒的阻塞状态。
+//这个时候主线程很快就运行完了，虚拟机退出，Daemon停止服务，输出操作自然失败了。
+}}}
+	
+	
+===== 实际应用例子 =====
+	在使用长连接的comet服务端推送技术中，消息推送线程设置为守护线程，服务于ChatServlet的servlet用户线程，在servlet的init启动消息线程，servlet一旦初始化后，一直存在服务器，servlet摧毁后,消息线程自动退出
+	
+	容器收到一个Servlet请求，调度线程从线程池中选出一个工作者线程,将请求传递给该工作者线程，然后由该线程来执行Servlet的 service方法。当这个线程正在执行的时候,容器收到另外一个请求,调度线程同样从线程池中选出另一个工作者线程来服务新的请求,容器并不关心这个请求是否访问的是同一个Servlet.当容器同时收到对同一个Servlet的多个请求的时候，那么这个Servlet的service()方法将在多线程中并发执行。
+	Servlet容器默认采用单实例多线程的方式来处理请求，这样减少产生Servlet实例的开销，提升了对请求的响应时间，对于Tomcat可以在server.xml中通过<Connector>元素设置线程池中线程的数目。
+	
+	{{./pasted_image.png}}
+	
+	**为什么要用守护线程？**
+	我们知道**静态变量是ClassLoader级别的，如果Web应用程序停止，这些静态变量也会从JVM中清除。但是线程则是JVM级别的，**如果你在Web 应用中启动一个线程，这个线程的生命周期并不会和Web应用程序保持同步。也就是说，即使你停止了Web应用，这个线程依旧是活跃的。正是因为这个很隐晦 的问题，**所以很多有经验的开发者不太赞成在Web应用中私自启动线程**。
+	
+	如果我们手工使用JDK Timer（Quartz的Scheduler），在Web容器启动时启动Timer，当Web容器关闭时，除非你手工关闭这个Timer，否则Timer中的任务还会继续运行！
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,12 @@
+Content-Type: text/x-zim-wiki
+Wiki-Format: zim 0.4
+Creation-Date: 2017-03-15T13:17:18+08:00
+
+====== 书单 ======
+Created 星期三 15 三月 2017
+
+===== JAVA =====
+	Java基础的知识点推荐《Java编程思想》，
+	JVM的推荐《深入理解Java虚拟机》，
+	Spring原理的推荐《Spring源码深度解析》，
+	网站架构的推荐《大型网站技术架构核心原理与案例分析》。

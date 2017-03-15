@@ -1,0 +1,49 @@
+Content-Type: text/x-zim-wiki
+Wiki-Format: zim 0.4
+Creation-Date: 2017-03-15T15:21:09+08:00
+
+====== 架构 ======
+Created 星期三 15 三月 2017
+
+===== Web服务框架 =====
+	[[+JFinal]]
+	[[+Spring]] 
+	
+===== 关系数据库 =====
+	[[+MyBatis]]
+	[[+Hibernate]] 
+	
+===== NoSQL =====
+	[[+Redis]] 
+	[[+MongoDB]] 
+	
+===== 消息队列 =====
+
+	[[+activeMQ]]
+	[[+rabbitMQ]] 
+
+
+===== 缓存服务 =====
+
+	[[+memcached]] 
+	[[+redis]] 
+	
+===== 高并发框架 =====
+	[[+Disputor]] 
+	
+===== Socket框架 =====
+	[[+Netty]] 
+	
+===== RPC框架 =====
+	[[+Zeroc-Ice]] 
+	[[+Thrift]] 
+	
+===== 负载均衡 =====
+	[[+nignx]] 
+	[[+lvs]] 
+	[[+Apache]]
+	[[+F5]] 
+	
+===== 分布式框架 =====
+	[[+Hadoop]] 
+	

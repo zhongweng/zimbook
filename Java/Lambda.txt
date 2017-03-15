@@ -1,0 +1,259 @@
+Content-Type: text/x-zim-wiki
+Wiki-Format: zim 0.4
+Creation-Date: 2017-03-07T19:35:45+08:00
+
+====== Lambda ======
+Created 星期二 07 三月 2017
+
+===== Background =====
+
+==== Anonymous Inner Class ====
+	n Java, **anonymous inner classes** provide a way to implement classes that may occur only once in an application. For example, in a standard Swing or JavaFX application a number of event handlers are required for keyboard and mouse events. Rather than writing a separate event-handling class for each event, you can write something like this.
+	
+	16     JButton testButton = new JButton("Test Button");
+	17     testButton.addActionListener(new ActionListener(){
+	18     @Override public void actionPerformed(ActionEvent ae){
+	19         System.out.println("Click Detected by Anon Class");
+	20       }
+	21     });
+	
+	Otherwise, **a separate class that implements ActionListener** is required for each event. By creating the class in place, where it is needed, the code is a little easier to read. The code is not elegant, because quite a bit of code is required just to define one method.
+
+
+==== Functional Interfaces ====
+	The code that defines the ActionListener interface, looks something like this:
+	   1 package java.awt.event;
+	   2 import java.util.EventListener;
+	   3 
+	   4 public interface ActionListener extends EventListener {
+	   5     
+	   6 public void actionPerformed(ActionEvent e);
+	   7 
+	   8 }
+	The ActionListener example is an interface with only one method. With Java SE 8, an interface that follows this pattern is known as a "functional interface."
+	
+	Note: This type of interface, was previously known as a Single Abstract Method type (SAM).
+	
+	Using functional interfaces with anonymous inner classes are a common pattern in Java. In addition to the EventListener classes, interfaces like Runnable and Comparator are used in a similar manner. Therefore, functional interfaces are leveraged for use with lambda expressions.
+	
+
+==== Lambda Expression Syntax ====
+	Lambda expressions address the bulkiness of anonymous inner classes by converting five lines of code into a single statement. This simple horizontal solution solves the "vertical problem" presented by inner classes.
+	
+	A lambda expression is composed of three parts.
+	{{./pasted_image.png}}
+	
+	The body can be either a single expression or a statement block. In the expression form, the body is simply evaluated and returned. In the block form, the body is evaluated like a method body and a return statement returns control to the caller of the anonymous method. The break and continue keywords are illegal at the top level, but are permitted within loops. If the body produces a result, every control path must return something or throw an exception.
+	
+	Take a look at these examples:
+	(int x, int y) -> x + y
+	
+	() -> 42
+	
+	(String s) -> { System.out.println(s); }
+	The first expression takes two integer arguments, named x and y, and uses the expression form to return x+y. The second expression takes no arguments and uses the expression form to return an integer 42. The third expression takes a string and uses the block form to print the string to the console, and returns nothing.
+	
+
+===== LambdaExamples =====
+
+==== Runnable Lambda ====
+	{{./pasted_image001.png}}
+	In both cases, notice that no parameter is passed and is returned. The Runnable lambda expression, which uses the block format, converts five lines of code into one statement.
+	
+
+==== Comparator Lambda ====
+	n Java, the Comparator class is used for sorting collections. In the following example, an ArrayList consisting of Person objects is sorted based on surName. The following are the fields included in the Person class.
+	{{./pasted_image002.png}}
+	The following code applies a Comparator by using an anonymous inner class and a couple lambda expressions.
+	{{./pasted_image003.png}}
+	
+	Lines 17 - 21 are easily replaced by the lambda expression on line 32. Notice that the first lambda expression declares the parameter type passed to the expression. However, as you can see from the second expression, this is optional. Lambda supports "target typing" which infers the object type from the context in which it is used. Because we are assigning the result to a Comparator defined with a generic, the compiler can infer that the two parameters are of the Person type.
+
+
+==== Listener Lambda ====
+	{{./pasted_image004.png}}
+	Notice that the lambda expression is passed as a parameter. Target typing is used in a number of contexts including the following:
+	
+	**Variable declarations**
+	**Assignments**
+	**Return statements**
+	**Array initializers**
+	**Method or constructor arguments**
+	**Lambda expression bodies**
+	**Conditional expressions ?:**
+	**Cast expressions**
+
+
+===== Improve Code with Lambda =====
+
+==== A Common Query Use Case ====
+	定义一个接口：
+	{{./pasted_image005.png}}
+	给接口直接赋值为Ｌａｍｂｄａ使用
+	{{./pasted_image006.png}}
+	
+
+===== The java.util.function Package =====
+	Of course, Predicate is not the only functional interface provided with Java SE 8. A number of standard interfaces are designed as a starter set for developers.
+	
+	**Predicate**: A property of the object passed as argument
+	**Consumer**: An action to be performed with the object passed as argument
+	**Function**: Transform a T to a U
+	**Supplier**: Provide an instance of a T (such as a factory)
+	**UnaryOperator**: A unary operator from T -> T
+	**BinaryOperator**: A binary operator from (T, T) -> T
+	In addition, many of these interfaces also have primitive versions. This should give you a great starting point for your lambda expressions.
+	
+
+==== The Function Interface ====
+	The Function interface is useful for this problem. It has only one method apply with the following signature:
+	
+	public R apply(T t){ }
+	
+	**It takes a generic class T and returns a generic class R**. For this example, pass the Person class and return a String. A more flexible print method for person could be written like this:
+	
+	{{./pasted_image007.png}}
+	
+
+===== Lambda Expressions and Collections =====
+	In the examples created so far, the collections classes were used quite a bit. However, a number of new lambda expression features change the way collections are used. This section introduces a few of these new features.
+
+
+==== Looping ====
+	The first feature to look at is the new forEach method available to any collection class. Here are a couple of examples that print out a Person list.
+	{{./pasted_image008.png}}
+	
+
+==== Chaining and Filters ====
+	n addition to looping through the contents of a collection, you can chain methods together. The first method to look at is filter which takes a Predicate interface as a parameter.
+	
+	The following example loops though a List after first filtering the results.
+	{{./pasted_image009.png}}
+	
+==== The stream Method ====
+	In the previous code example, notice that the stream method is called before filtering and looping begin. This method takes a Collection as input and returns a java.util.stream.Stream interface as the output. A Stream represents a sequence of elements on which various methods can be chained. By default, once elements are consumed they are no longer available from the stream. Therefore, a chain of operations can occur only once on a particular Stream. In addition, a Stream can be serial(default) or parallel depending on the method called. An example of a parallel stream is included at the end of this section.
+	
+==== Mutation and Results ====
+	As previously mentioned, a Stream is disposed of after its use. Therefore, the elements in a collection cannot be changed or mutated with a Stream. However, what if you want to keep elements returned from your chained operations? You can save them to a new collection. The following code shows how to do just that.
+	
+	{{./pasted_image010.png}}
+	
+==== Calculating with map ====
+	The map method is commonly used with filter. The method takes a property from a class and does something with it. The following example demonstrates this by performing calculations based on age.
+	{{./pasted_image011.png}}
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

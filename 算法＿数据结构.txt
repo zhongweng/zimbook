@@ -1,0 +1,16 @@
+Content-Type: text/x-zim-wiki
+Wiki-Format: zim 0.4
+Creation-Date: 2017-03-08T13:47:43+08:00
+
+====== 算法＿数据结构 ======
+Created 星期三 08 三月 2017
+
+	[[+Array]]
+	[[+LinkList]] 
+	[[+Stack]]
+	[[+Queue]] 
+	[[+Tree]] 
+	
+	[[+排序]]	
+	[[+查找]]
+	
