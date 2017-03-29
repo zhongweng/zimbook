@@ -1,0 +1,343 @@
+Content-Type: text/x-zim-wiki
+Wiki-Format: zim 0.4
+Creation-Date: 2017-03-17T16:55:44+08:00
+
+====== Unsafe ======
+Created 星期五 17 三月 2017
+
+	java最初被设计为一种安全的受控环境。尽管如此，HotSpot还是包含了一个后门**sun.misc.Unsafe**，提供了**一些可以直接操控内存和线程的底层操作**。**Unsafe被JDK广泛应用于java.nio和并发包等实现中**，这个不安全的类提供了一个观察HotSpot JVM内部结构并且可以对其进行修改，但是不建议在生产环境中使用。
+	
+	Unsafe类是如此地不安全，以至于JDK开发者增加了很多特殊限制来访问它。
+	
+	Java也广泛应用于各种**低延迟的应用**中，如游戏服务器和高频率的交易应用。这只所以能够实现要归功于**Java的类和包在可见性规则中有一个恰到好处的漏洞，让我们能够使用一个很便利的类，这个类就是sun.misc.Unsafe**。
+	
+	* **私有的构造器**
+	* **工厂方法getUnsafe()的调用器只能被Bootloader加载，否则抛出SecurityException 异常**
+	不过，我们可以通过反射机制轻松获取Unsafe的一个实例。
+	
+{{{code: lang="java" linenumbers="True"
+public static Unsafe getUnsafe() {
+   try {
+           Field f = Unsafe.class.getDeclaredField("theUnsafe");
+           f.setAccessible(true);
+           return (Unsafe)f.get(null);
+   } catch (Exception e) { 
+       /* ... */
+   }
+}
+}}}
+	
+	
+一些有用的方法
+
+	**objectFieldOffset：能够获取到指定实例变量的在对象内存中的偏移量**
+		long offset = UNSAFE.objectFieldOffset(UnsafeTest.class.getDeclaredField("state"));
+	**compareAndSwapInt：通过比较并替换的机制，修改指定偏移量内存的值**
+		UNSAFE.compareAndSwapInt(unsafeTest, offset, 0, 1)
+	park：挂起某一线程
+	unpark：唤醒某一线程
+	
+===== 组织 =====
+	乍看上去，sun.misc.Unsafe的特性集合可能会让我们觉得有些混乱，它一站式地提供了各种特性。
+	
+	我试图将这些特性进行分类，可以得到如下5种使用场景：
+	
+	* 对变量和数组内容的原子访问，自定义**内存屏障**
+	* **对序列化的支持**
+	* **自定义内存管理/高效的内存布局**
+	* **与原生代码和其他JVM进行互操作**
+	* **对高级锁的支持**
+
+===== 原子访问 =====
+	原子访问是sun.misc.Unsafe被广泛应用的特性之一，特性包括简单的“put”和“get”操作（带有volatile语义或不带有volatile语义）以及比较并交换（compare and swap，CAS）操作。
+	
+	public long update() {
+	 for(;;) {
+	   long version = this.version;
+	   long newVersion = version + 1;
+	   if (UNSAFE.compareAndSwapLong(this, VERSION_OFFSET, version, newVersion)) {
+		  return newVersion;
+	   }
+	  }
+	}
+	
+	但是，请稍等，Java不是已经通过官方API为该功能提供了支持吗？绝对是这样的，借助Atomic类确实能够做到，但是它会像基于sun.misc.Unsafe的API一样丑陋，在某些方面甚至更糟糕，让我们看一下到底为什么。
+	
+	AtomicX类实际上是真正的对象。假设我们要维护一个存储系统中的某条记录，并且希望能够跟踪一些特定的统计数据或元数据，比如版本的计数：
+	
+	public class Record {
+	 private final AtomicLong version = new AtomicLong(0);
+	
+	 public long update() {
+	   return version.incrementAndGet();
+	 }
+	}
+	
+	尽管这段代码非常易读，但是它却污染到了我们的堆，因为每条数据记录都对应两个不同的对象，而不是一个对象，具体来讲，这两个对象也就是Atomic实例以及实际的记录本身。它所导致的问题不仅仅是产生无关的垃圾，而且会导致额外的内存占用以及Atomic实例的解引用（dereference）操作。
+	
+	但是，我们可以做的更好一点——还有另外一个API，那就是**java.util.concurrent.atomic.AtomicXFieldUpdater**类。
+	
+	AtomixXFieldUpdater是正常Atomic类的内存优化版本，它牺牲了API的简洁性来换取内存占用的优化。通过该组件的单个实例就能支持某个类的多个实例，在我们的Record场景中，可以用它来更新volatile域。
+	
+	public class Record {
+	 private static final AtomicLongFieldUpdater<Record> VERSION =
+		  AtomicLongFieldUpdater.newUpdater(Record.class, "version");
+	
+	 private volatile long version = 0;
+	
+	 public long update() {
+	   return VERSION.incrementAndGet(this);
+	 }
+	}
+	
+	在对象创建方面，这种方式能够生成更为高效的代码。同时，这个updater是一个静态的final域，对于任意数量的record，只需要有一个updater就可以了，并且最重要的是，它现在就是可用的。除此之外，它还是一个受支持的公开API，它始终应该是优选的策略。不过，另一方面，我们看一下updater的创建和使用方式，它依然非常丑陋，不是非常易读，坦白说，凭直觉看不出来它是个计数器。
+	
+	那么，我们能更好一点吗？是的，**变量句柄（Variable Handles）**（或者简洁地称之为“VarHandles”）目前正处于设计阶段，它提供了一种更有吸引力的API。
+	
+	**VarHandles**是对数据行为（data-behavior）的一种抽象。它们提供了类似volatile的访问方式，不仅能够用在域上，还能用于数组或buffers中的元素上。
+	
+	乍看上去，下面的样例可能显得有些诡异，所以我们看一下它是如何实现的。
+{{{code: lang="java" linenumbers="True"
+public class Record {
+ private static final VarHandle VERSION;
+
+ static {
+   try {
+     VERSION = MethodHandles.lookup().findFieldVarHandle
+        (Record.class, "version", long.class);
+   } catch (Exception e) {
+      throw new Error(e);
+   }
+ }
+
+ private volatile long version = 0;
+
+ public long update() {
+   return (long) VERSION.addAndGet(this, 1);
+ }
+}
+}}}
+	
+	**VarHandles是通过使用MethodHandles** API创建的，它是到JVM内部链接（linkage）行为的直接入口点。我们使用了MethodHandles-Lookup方法，将包含域的类、域的名称以及域的类型传递进来，或者也可以说我们对java.lang.reflect.Field进行了“**反射的反操作（unreflect）**”。
+	
+	那么，你可能会问它为什么会比AtomicXFieldUpdater API更好呢？如前所述，VarHandles是对所有变量类型的通用抽象，包括数组甚至ByteBuffer。也就是说，我们能够通过它抽象所有不同的类型。在理论上，这听起来非常棒，但是在当前的原型中依然存在一定的不足。对返回值的显式类型转换是必要的，因为编译器还不能自动将类型判断出来。另外，因为这个实现依然处于早期的原型阶段，所以它还有一些其他的怪异之处。随着有更多的人参与VarHandles，我希望这些问题将来能够消失掉，在Valhalla项目中所提议的一些相关的语言增强已经逐渐成形了。
+	
+===== 序列化 =====
+	在当前，另外一个重要的使用场景就是序列化。不管你是在设计分布式系统，还是将序列化的元素存储到数据库中，或者实现非堆的功能，Java对象都要以某种方式进行快速序列化和反序列化。这方面的座右铭是“越快越好”。因此，很多的序列化框架都会使用**Unsafe::allocateInstance**，**它在初始化对象的时候，能够避免调用构造器方法**，在反序列化的时候，这是很有用的。这样做会节省很多时间并且能够保证安全性，因为对象的状态是通过反序列化过程重建的。
+	
+	public String deserializeString() throws Exception {
+	 char[] chars = readCharsFromStream();
+	 String allocated = (String) UNSAFE.allocateInstance(String.class);
+	 UNSAFE.putObjectVolatile(allocated, VALUE_OFFSET, chars);
+	 return allocated;
+	}
+	
+	
+	请注意，即便在Java 9中sun.misc.Unsafe依然可用，上述的代码片段也可能会出现问题，因为有一项工作是优化String的内存占用的。在Java 9中将会移除char[]值，并将其替换为byte[]。请参考提升String内存效率的JEP草案来了解更多细节。
+	
+===== 内存管理 =====
+	un.misc.Unsafe最重要的用途可能就是读取和写入了，这不仅包括第一节所看到的针对堆空间的操作，它还能对Java堆之外的区域进行读取和写入。按照这种说法，就需要原生内存（通过地址/指针来体现）了，并且偏移量需要手动计算。例如：
+	public long memory() {
+	 long address = UNSAFE.allocateMemory(8);
+	 UNSAFE.putLong(address, Long.MAX_VALUE);
+	 return UNSAFE.getLong(address);
+	}
+	
+	有人可能会跳起来说，同样的事情还可以直接使用ByteBuffers来实现：
+	
+	public long memory() {
+	 ByteBuffer byteBuffer = ByteBuffer.allocateDirect(8);
+	 byteBuffer.putLong(0, Long.MAX_VALUE);
+	 return byteBuffer.getLong(0);
+	}
+	表面上看，这种方式似乎更有吸引力：不过遗憾的是，ByteBuffer只能用于大约2GB的数据，因为DirectByteBuffer只能通过一个int（ByteBuffer::allocateDirect(int)）来创建。另外，ByteBuffer API的所有索引都是32位的。比尔·盖茨不是还说过“谁需要超过32位的东西呢？”
+	
+	使用long类型改造这个API会破坏兼容性，所以VarHandles来拯救我们了。
+	
+	public long memory() {
+	 ByteBuffer byteBuffer = ByteBuffer.allocateDirect(8);
+	 VarHandle bufferView = 
+			   MethodHandles.byteBufferViewVarHandle(long[].class, true);
+	 bufferView.set(byteBuffer, 0, Long.MAX_VALUE);
+	 return bufferView.get(byteBuffer, 0);
+	}
+	
+	在本例中，VarHandle API真得更好吗？此时，我们受到相同的限制，只能创建大约2GB的ByteBuffer，并且针对ByteBuffer视图所创建的内部VarHandle实现也是基于int的，但是这个问题可能也“可以解决”。所以，就目前来讲，这个问题还没有真正的解决方案。不过这里的API是与第一个例子相同的VarHandle API。
+	
+	有一些其他的可选方案正处于讨论之中。Oracle的工程师Paul Sandoz，他同时还是JEP 193：Variable Handles项目的负责人，曾经在twitter讨论过内存区域（Memory Region）的概念，尽管这个概念还不清晰，但是这种方式看起来很有前景。一个清晰的API可能看起来会如下面的程序片段所示。
+	
+	public long memory() {
+	 MemoryRegion region = MemoryRegion
+		  .allocateNative("myname", MemoryRegion.UNALIGNED, Long.MAX_VALUE);
+	
+	 VarHandle regionView = 
+				 MethodHandles.memoryRegionViewVarHandle(long[].class, true);
+	 regionView.set(region, 0, Long.MAX_VALUE);
+	 return regionView.get(region, 0);
+	}
+	
+	这只是一个理念，希望Panama项目，也就是OpenJDK的原生代码项目，能够为这些抽象提出一项提议，因为这些内存区域也需要用到原生库，在它的调用中会预期传入内存地址（指针）。
+	
+	
+===== 互操作性 =====
+	最后一个话题是互操作性（interoperability）。这并不限于在不同的JVM间高效地传递数据（可能会通过共享内存，它可能是某种类型的内存区域，这样能够避免缓慢的socket通信），而且还包含与原生代码的通信和信息交换。
+	
+	Panama项目致力于取代JNI，提供一种更加类似于Java并高效的方式。关注JRuby的人可能会知道Charles Nutter，这是因为他为JNR所作出的贡献，也就是Java Native Runtime，尤其是JNR-FFI实现。FFI指的是外部函数接口（Foreign Function Interface），对于使用其他语言（如Ruby、Python等等）的人来说，这是一个典型的术语。
+	基本上来讲，FFI会为调用C（以及依赖于特定实现的C++）构建一个抽象层，这样其他的语言就可以直接进行调用了，而不必像在Java中那样创建胶水代码。
+	
+	举例来讲，假设我们希望通过Java获取一个pid，当前所需要的是如下的C代码：
+	extern c {
+	  JNIEXPORT int JNICALL 
+		   Java_ProcessIdentifier_getProcessId(JNIEnv *, jobject);
+	}
+	
+	JNIEXPORT int JNICALL 
+		   Java_ProcessIdentifier_getProcessId(JNIEnv *env, jobject thisObj) {
+	 return getpid();
+	}
+	
+	--Java 代码:
+	public class ProcessIdentifier {
+	 static {
+	   System.loadLibrary("processidentifier");
+	 }
+	
+	 public native void talk();
+	}
+	
+	使用JNR我们可以将其简化为一个简单的Java接口，它会通过JNR实现绑定的原生调用上。
+	
+	interface LibC {
+	  void getpid();
+	}
+	
+	public int call() {
+	 LibC c = LibraryLoader.create(LibC.class).load("c");
+	 return c.getpid();
+	}
+	
+	JNR内部会将绑定代码织入进去并将其注入到JVM中。因为Charles Nutter是JNR的主要开发者之一，并且他还参与Panama项目，所以我们有理由相信会出现一些非常类似的内容。
+	
+	通过查看OpenJDK的邮件列表，我们似乎很快就会拥有MethodHandle的另外一种变种形式，它会绑定原生代码。可能出现的绑定代码如下所示：
+	public void call() {
+	 MethodHandle handle = MethodHandles
+				   .findNative(null, "getpid", MethodType.methodType(int.class));
+	 return (int) handle.invokeExact();
+	}
+	如果你之前没有见过MethodHandles的话，这看起来可能有些怪异，但是它明显要比JNI版本更加简洁和具有表现力。这里最棒的一点在于，与反射得到Method实例类似，MethodHandle可以进行缓存（通常也应该这样做），这样就可以多次调用了。我们还可以将原生调用直接内联到JIT后的Java代码中。
+	
+	不过，我依然更喜欢JNR接口的版本，因为从设计角度来讲它更加简洁。另外，我确信未来能够拥有直接的接口绑定，它是MethodHandle API之上非常好的语言抽象——如果规范不提供的话，那么一些热心的开源提交者也会提供。
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	

@@ -1,0 +1,149 @@
+Content-Type: text/x-zim-wiki
+Wiki-Format: zim 0.4
+Creation-Date: 2017-03-28T08:57:16+08:00
+
+====== LinkedBlockingQueue ======
+Created 星期二 28 三月 2017
+
+	LinkedBlockingQueue是一个单向链表实现的阻塞队列。该队列按 FIFO（先进先出）排序元素，新元素插入到队列的尾部，并且队列获取操作会获得位于队列头部的元素。链接队列的吞吐量通常要高于基于数组的队列，但是在大多数并发应用程序中，其可预知的性能要低。
+	
+	此外，LinkedBlockingQueue还是可选容量的(防止过度膨胀)，即可以指定队列的容量。如果不指定，默认容量大小等于Integer.MAX_VALUE。
+
+{{./pasted_image.png}}
+
+	说明：
+	1. LinkedBlockingQueue继承于AbstractQueue，它本质上是一个FIFO(先进先出)的队列。
+	2. LinkedBlockingQueue实现了BlockingQueue接口，它支持多线程并发。当多线程竞争同一个资源时，某线程获取到该资源之后，其它线程需要阻塞等待。
+	3. LinkedBlockingQueue是通过单链表实现的。
+	(01) head是链表的表头。取出数据时，都是从表头head处插入。
+	(02) last是链表的表尾。新增数据时，都是从表尾last处插入。
+	(03) count是链表的实际大小，即当前链表中包含的节点个数。
+	(04) capacity是列表的容量，它是在创建链表时指定的。
+	(05) putLock是插入锁，takeLock是取出锁；notEmpty是“非空条件”，notFull是“未满条件”。通过它们对链表进行并发控制。
+		   **LinkedBlockingQueue在实现“多线程对竞争资源的互斥访问”时，对于“插入”和“取出(删除)”操作分别使用了不同的锁。对于插入操作，通过“插入锁putLock”进行同步；对于取出操作，通过“取出锁takeLock”进行同步。**
+	**       此外，插入锁putLock和“非满条件notFull”相关联，取出锁takeLock和“非空条件notEmpty”相关联。通过notFull和notEmpty更细腻的控制锁。**
+	
+		 **-- 若某线程(线程A)要取出数据时，队列正好为空，则该线程会执行notEmpty.await()进行等待；当其它某个线程(线程B)向队列中插入了数据之后，会调用notEmpty.signal()唤醒“notEmpty上的等待线程”。此时，线程A会被唤醒从而得以继续运行。 此外，线程A在执行取操作前，会获取takeLock，在取操作执行完毕再释放takeLock。**
+	**     -- 若某线程(线程H)要插入数据时，队列已满，则该线程会它执行notFull.await()进行等待；当其它某个线程(线程I)取出数据之后，会调用notFull.signal()唤醒“notFull上的等待线程”。此时，线程H就会被唤醒从而得以继续运行。 此外，线程H在执行插入操作前，会获取putLock，在插入操作执行完毕才释放putLock。**
+	
+	
+	// 容量
+	private final int capacity;
+	// 当前数量
+	private final AtomicInteger count = new AtomicInteger(0);
+	private transient Node<E> head; // 链表的表头
+	private transient Node<E> last; // 链表的表尾
+	// 用于控制“删除元素”的互斥锁takeLock 和 锁对应的“非空条件”notEmpty
+	private final ReentrantLock takeLock = new ReentrantLock();
+	private final Condition notEmpty = takeLock.newCondition();
+	// 用于控制“添加元素”的互斥锁putLock 和 锁对应的“非满条件”notFull
+	private final ReentrantLock putLock = new ReentrantLock();
+	private final Condition notFull = putLock.newCondition();
+	复制代码
+	
+===== 添加 =====
+	public boolean offer(E e) {
+		if (e == null) throw new NullPointerException();
+		// 如果“队列已满”，则返回false，表示插入失败。
+		final **AtomicInteger** count = this.count;
+		if (count.get() == capacity)
+			return false;
+		int c = -1;
+		// 新建“节点e”
+		Node<E> node = new Node(e);
+		final ReentrantLock putLock = this.putLock;
+		// 获取“插入锁putLock”
+		putLock.lock();
+		try {
+			// 再次对“队列是不是满”的进行判断。
+			// 若“队列未满”，则插入节点。
+			if (count.get() < capacity) {
+				// 插入节点
+				enqueue(node);
+				// 将“当前节点数量”+1，并返回“原始的数量”
+				c = count.getAndIncrement();
+				**// 如果在插入元素之后，队列仍然未满，则唤醒notFull上的等待线程。**
+	**            if (c + 1 < capacity)**
+	**                notFull.signal();**
+			}
+		} finally {
+			// 释放“插入锁putLock”
+			putLock.unlock();
+		}
+		**// 如果在插入节点前，队列为空；则插入节点后，唤醒notEmpty上的等待线程**
+		if (c == 0)
+			**signalNotEmpty();**
+		return c >= 0;
+	}
+	
+
+	private void signalNotEmpty() {
+		final ReentrantLock takeLock = this.takeLock;
+		takeLock.lock();
+		try {
+			notEmpty.signal();
+		} finally {
+			takeLock.unlock();
+		}
+	}
+	
+===== 取出 =====
+	public E take() throws InterruptedException {
+		E x;
+		int c = -1;
+		final AtomicInteger count = this.count;
+		final ReentrantLock takeLock = this.takeLock;
+		// 获取“取出锁”，若当前线程是中断状态，则抛出InterruptedException异常
+		takeLock.lockInterruptibly();
+		try {
+			// 若“队列为空”，则一直等待。
+			while (count.get() == 0) {
+				notEmpty.await();
+			}
+			// 取出元素
+			x = dequeue();
+			**// 取出元素之后，将“节点数量”-1；并返回“原始的节点数量”。**
+	**        c = count.getAndDecrement();**
+	**        if (c > 1)**
+	**            notEmpty.signal();**
+		} finally {
+			// 释放“取出锁”
+			takeLock.unlock();
+		}
+		**// 如果在“取出元素之前”，队列是满的；则在取出元素之后，唤醒notFull上的等待线程。**
+	**    if (c == capacity)**
+	**        signalNotFull();**
+		return x;
+	}
+	
+	private void **signalNotFull**() {
+		final ReentrantLock putLock = this.putLock;
+		putLock.lock();
+		try {
+			notFull.signal();
+		} finally {
+			putLock.unlock();
+		}
+	}
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	

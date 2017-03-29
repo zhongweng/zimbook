@@ -10,7 +10,10 @@ Created 星期三 08 三月 2017
 	[[+Stack]]
 	[[+Queue]] 
 	[[+Tree]] 
-	
+	[[+SkipList]] 
+
+
+ 
 	[[+排序]]	
 	[[+查找]]
 	
