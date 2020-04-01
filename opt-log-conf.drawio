@@ -1,4 +1,4 @@
-<mxfile host="app.diagrams.net" modified="2020-03-31T15:11:12.060Z" agent="5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.149 Safari/537.36" etag="9Tj5rDI4SwWP1ssMx78L" version="12.9.4" type="github">
+<mxfile host="app.diagrams.net" modified="2020-04-01T10:44:06.435Z" agent="5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.149 Safari/537.36" etag="fneLRaQIFzr-TI8wbzHS" version="12.9.4" type="github">
   <diagram id="vfveO5V5EfFadrUy32x-" name="Page-1">
     <mxGraphModel dx="1186" dy="678" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
@@ -56,25 +56,16 @@
         <mxCell id="F5PoxRLjsKKdmpSsgsS4-22" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="F5PoxRLjsKKdmpSsgsS4-15" target="F5PoxRLjsKKdmpSsgsS4-16">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="F5PoxRLjsKKdmpSsgsS4-31" style="edgeStyle=none;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.525;entryY=-0.012;entryDx=0;entryDy=0;entryPerimeter=0;dashed=1;" edge="1" parent="1" source="F5PoxRLjsKKdmpSsgsS4-15" target="F5PoxRLjsKKdmpSsgsS4-29">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
         <mxCell id="F5PoxRLjsKKdmpSsgsS4-15" value="添加object_type" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
           <mxGeometry x="242" y="599" width="120" height="40" as="geometry" />
         </mxCell>
         <mxCell id="F5PoxRLjsKKdmpSsgsS4-26" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="F5PoxRLjsKKdmpSsgsS4-16" target="F5PoxRLjsKKdmpSsgsS4-18">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="F5PoxRLjsKKdmpSsgsS4-32" style="edgeStyle=none;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.75;entryY=0;entryDx=0;entryDy=0;dashed=1;" edge="1" parent="1" source="F5PoxRLjsKKdmpSsgsS4-16" target="F5PoxRLjsKKdmpSsgsS4-29">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
         <mxCell id="F5PoxRLjsKKdmpSsgsS4-16" value="添加opt_type" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
           <mxGeometry x="442" y="599" width="120" height="40" as="geometry" />
         </mxCell>
         <mxCell id="F5PoxRLjsKKdmpSsgsS4-21" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="F5PoxRLjsKKdmpSsgsS4-17" target="F5PoxRLjsKKdmpSsgsS4-15">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="F5PoxRLjsKKdmpSsgsS4-30" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.25;entryY=0;entryDx=0;entryDy=0;dashed=1;" edge="1" parent="1" source="F5PoxRLjsKKdmpSsgsS4-17" target="F5PoxRLjsKKdmpSsgsS4-29">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="F5PoxRLjsKKdmpSsgsS4-17" value="添加system_origin" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
@@ -89,23 +80,20 @@
         <mxCell id="F5PoxRLjsKKdmpSsgsS4-28" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="F5PoxRLjsKKdmpSsgsS4-19" target="F5PoxRLjsKKdmpSsgsS4-18">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="F5PoxRLjsKKdmpSsgsS4-33" style="edgeStyle=none;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;dashed=1;" edge="1" parent="1" source="F5PoxRLjsKKdmpSsgsS4-19" target="F5PoxRLjsKKdmpSsgsS4-29">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
         <mxCell id="F5PoxRLjsKKdmpSsgsS4-19" value="参与diff字段&lt;br&gt;排除diff字段" style="shape=document;whiteSpace=wrap;html=1;boundedLbl=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
-          <mxGeometry x="662" y="729" width="120" height="60" as="geometry" />
+          <mxGeometry x="662" y="702" width="120" height="60" as="geometry" />
         </mxCell>
         <mxCell id="F5PoxRLjsKKdmpSsgsS4-20" value="生成 log" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;" vertex="1" parent="1">
           <mxGeometry x="882" y="599" width="120" height="40" as="geometry" />
         </mxCell>
         <mxCell id="F5PoxRLjsKKdmpSsgsS4-29" value="配置化" style="rounded=0;whiteSpace=wrap;html=1;strokeColor=#000000;dashed=1;fontSize=11;labelBackgroundColor=#ffffff;endArrow=classic;" vertex="1" parent="1">
-          <mxGeometry x="152" y="719" width="320" height="80" as="geometry" />
+          <mxGeometry x="501" y="874" width="320" height="80" as="geometry" />
         </mxCell>
         <mxCell id="F5PoxRLjsKKdmpSsgsS4-35" value="ssad 枚举" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
           <mxGeometry x="252" y="549" width="108" height="20" as="geometry" />
         </mxCell>
         <mxCell id="F5PoxRLjsKKdmpSsgsS4-36" value="代码固化逻辑" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
-          <mxGeometry x="611" y="687" width="108" height="20" as="geometry" />
+          <mxGeometry x="601" y="671" width="108" height="20" as="geometry" />
         </mxCell>
         <mxCell id="F5PoxRLjsKKdmpSsgsS4-37" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1" source="F5PoxRLjsKKdmpSsgsS4-38" target="F5PoxRLjsKKdmpSsgsS4-39">
           <mxGeometry relative="1" as="geometry" />
@@ -311,6 +299,9 @@
         </mxCell>
         <mxCell id="F5PoxRLjsKKdmpSsgsS4-106" value="可读 log" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;" vertex="1" parent="1">
           <mxGeometry x="847" y="1931.5" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="F5PoxRLjsKKdmpSsgsS4-108" value="业务侧" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;" vertex="1" parent="1">
+          <mxGeometry x="659" y="519" width="108" height="20" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
