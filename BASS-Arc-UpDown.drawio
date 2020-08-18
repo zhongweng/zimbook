@@ -1,6 +1,6 @@
-<mxfile host="app.diagrams.net" modified="2020-08-18T03:07:28.190Z" agent="5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/84.0.4147.125 Safari/537.36" etag="wa3lp2iFZ7b8F1ptk7X4" version="13.6.2" type="github">
+<mxfile host="app.diagrams.net" modified="2020-08-18T10:50:58.630Z" agent="5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/84.0.4147.125 Safari/537.36" etag="SJzH3t52x8nZH3IWQgnn" version="13.6.2" type="github">
   <diagram id="uCK1sygjS2s6QOBToBT4" name="Page-1">
-    <mxGraphModel dx="2390" dy="1015" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+    <mxGraphModel dx="3171" dy="1522" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -765,14 +765,17 @@
         <mxCell id="Wf43FNyR2-f-HZP9SnfN-219" value="物理库表配置" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
           <mxGeometry x="2830.5" y="882" width="148" height="20" as="geometry" />
         </mxCell>
-        <mxCell id="Wf43FNyR2-f-HZP9SnfN-246" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;startArrow=classic;startFill=1;fontSize=16;" edge="1" parent="1" source="Wf43FNyR2-f-HZP9SnfN-220" target="Wf43FNyR2-f-HZP9SnfN-17">
-          <mxGeometry relative="1" as="geometry" />
+        <mxCell id="Wf43FNyR2-f-HZP9SnfN-250" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;startArrow=classic;startFill=1;fontSize=16;" edge="1" parent="1" source="Wf43FNyR2-f-HZP9SnfN-220">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1257" y="390" as="targetPoint" />
+          </mxGeometry>
         </mxCell>
         <mxCell id="Wf43FNyR2-f-HZP9SnfN-220" value="接入PSM监控" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
-          <mxGeometry x="975" y="359.75" width="176" height="58.5" as="geometry" />
+          <mxGeometry x="975" y="360.75" width="176" height="58.5" as="geometry" />
         </mxCell>
-        <mxCell id="Wf43FNyR2-f-HZP9SnfN-247" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;startArrow=classic;startFill=1;fontSize=16;" edge="1" parent="1" source="Wf43FNyR2-f-HZP9SnfN-222" target="Wf43FNyR2-f-HZP9SnfN-18">
+        <mxCell id="Wf43FNyR2-f-HZP9SnfN-247" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;startArrow=classic;startFill=1;fontSize=16;" edge="1" parent="1" source="Wf43FNyR2-f-HZP9SnfN-222">
           <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1257" y="463" as="targetPoint" />
             <Array as="points">
               <mxPoint x="1151" y="463" />
             </Array>
@@ -847,6 +850,9 @@
         </mxCell>
         <mxCell id="Wf43FNyR2-f-HZP9SnfN-245" value="接&lt;br style=&quot;font-size: 16px&quot;&gt;入&lt;br style=&quot;font-size: 16px&quot;&gt;层" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;opacity=50;fontSize=16;fontStyle=1" vertex="1" parent="1">
           <mxGeometry x="2029" y="326" width="40" height="166" as="geometry" />
+        </mxCell>
+        <mxCell id="Wf43FNyR2-f-HZP9SnfN-249" value="BASS Resource&amp;nbsp;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;opacity=50;fontSize=16;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="1051" y="1228" width="140" height="166" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
