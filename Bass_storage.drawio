@@ -1,4 +1,4 @@
-<mxfile host="app.diagrams.net" modified="2020-09-20T03:21:22.265Z" agent="5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.83 Safari/537.36" etag="CQOyTxMxGntCgnOYiuG7" version="13.7.3" type="github">
+<mxfile host="app.diagrams.net" modified="2020-09-20T03:29:04.602Z" agent="5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.83 Safari/537.36" etag="-TQUW7fjKNBrPcIESaNX" version="13.7.3" type="github">
   <diagram id="sBlKYHkHXiTFA0Ll7E5o" name="Page-1">
     <mxGraphModel dx="977" dy="606" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
@@ -12,9 +12,6 @@
         </mxCell>
         <mxCell id="h5bv8y5jZey22ACNWMLN-1" value="" style="rounded=0;whiteSpace=wrap;html=1;dashed=1;" parent="1" vertex="1">
           <mxGeometry x="149.5" y="395" width="772.5" height="233" as="geometry" />
-        </mxCell>
-        <mxCell id="4RnhHxQTcm20Ra0JiDWr-3" value="业务领域模型" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
-          <mxGeometry x="445.5" y="190" width="156" height="20" as="geometry" />
         </mxCell>
         <mxCell id="l24l7IfbjVIZF7O3o2gP-23" style="edgeStyle=none;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="4RnhHxQTcm20Ra0JiDWr-4" target="4RnhHxQTcm20Ra0JiDWr-14">
           <mxGeometry relative="1" as="geometry" />
@@ -30,24 +27,6 @@
         </mxCell>
         <mxCell id="4RnhHxQTcm20Ra0JiDWr-4" value="" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
           <mxGeometry x="180" y="222" width="522" height="68" as="geometry" />
-        </mxCell>
-        <mxCell id="4RnhHxQTcm20Ra0JiDWr-5" value="" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
-          <mxGeometry x="330" y="230" width="120" height="48" as="geometry" />
-        </mxCell>
-        <mxCell id="4RnhHxQTcm20Ra0JiDWr-6" value="" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
-          <mxGeometry x="480" y="230" width="120" height="50" as="geometry" />
-        </mxCell>
-        <mxCell id="4RnhHxQTcm20Ra0JiDWr-7" value="主实体" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
-          <mxGeometry x="197" y="246" width="96" height="20" as="geometry" />
-        </mxCell>
-        <mxCell id="4RnhHxQTcm20Ra0JiDWr-8" value="子实体:定向" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
-          <mxGeometry x="342" y="244" width="96" height="20" as="geometry" />
-        </mxCell>
-        <mxCell id="4RnhHxQTcm20Ra0JiDWr-10" value="子实体:XX" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
-          <mxGeometry x="494" y="242" width="96" height="20" as="geometry" />
-        </mxCell>
-        <mxCell id="4RnhHxQTcm20Ra0JiDWr-11" value="..." style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
-          <mxGeometry x="630" y="230" width="60" height="49" as="geometry" />
         </mxCell>
         <mxCell id="4RnhHxQTcm20Ra0JiDWr-13" value="数据存储模型" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
           <mxGeometry x="824" y="395" width="91" height="20" as="geometry" />
@@ -157,6 +136,12 @@
         </mxCell>
         <mxCell id="l24l7IfbjVIZF7O3o2gP-22" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.682;entryY=0.019;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="1" source="4RnhHxQTcm20Ra0JiDWr-15" target="4RnhHxQTcm20Ra0JiDWr-48">
           <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="4RnhHxQTcm20Ra0JiDWr-3" value="业务领域模型" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="459" y="189" width="156" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="l24l7IfbjVIZF7O3o2gP-32" value="业务领域实体" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="363" y="246" width="156" height="20" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
